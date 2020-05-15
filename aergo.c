@@ -1018,6 +1018,36 @@ bool check_blockchain_id_hash(aergo *instance) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static request * new_request(aergo *instance) {
+  struct request *request;
+
+  if (!instance) return NULL;
+
+  request = malloc(sizeof(struct request));
+  if (!request) return NULL;
+
+  memset(request, 0, sizeof(struct request));
+  request->sock = INVALID_SOCKET;
+
+  llist_add(&instance->requests, request);
+
+  return request;
+}
+
+void free_request(aergo *instance, struct request *request) {
+
+  if (!instance || !request) return;
+
+  if (request->response) free(request->response);
+
+  llist_remove(&instance->requests, request);
+
+  free(request);
+
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // EXPORTED FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1532,12 +1562,26 @@ loc_failed:
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-int aergo_connect(aergo *instance, char *host) {
-  return sh2lib_connect(&instance->hd, host);
+aergo * aergo_connect(char *host, int port) {
+  aergo *instance;
+
+  instance = malloc(sizeof(struct aergo));
+  if (!instance) return NULL;
+
+  memset(instance, 0, sizeof(struct aergo));
+
+  strcpy(instance->host, host);
+  instance->port = port;
+  instance->timeout = 5000; /* default timeout */
+
+  return instance;
 }
 
 void aergo_free(aergo *instance) {
-  sh2lib_free(&instance->hd);
+  if (instance) {
+    while (instance->requests) free_request(instance, instance->requests);
+    free(instance);
+  }
 }
 
 void aergo_free_account(aergo_account *account) {

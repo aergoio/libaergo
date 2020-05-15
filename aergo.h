@@ -3,7 +3,7 @@
 
 typedef struct aergo aergo;
 
-int  aergo_connect(aergo *instance, char *host, int port);
+aergo * aergo_connect(char *host, int port);
 void aergo_free(aergo *instance);
 
 

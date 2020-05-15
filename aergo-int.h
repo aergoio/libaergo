@@ -42,7 +42,7 @@ struct request {
   int return_size;
   process_response_cb process_response;
   SOCKET sock;
-  char *response; // dynamically allocated ?
+  char *response;
   int response_size;
   int received;
   bool success;
@@ -58,6 +58,9 @@ struct aergo {
   request *requests;
 };
 
+
+static request * new_request(aergo *instance);
+void free_request(aergo *instance, struct request *request);
 
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size);
