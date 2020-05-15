@@ -1,9 +1,9 @@
 #include "aergo.h"
+#include "aergo-int.h"
 
-#include "pb_common.h"
-#include "pb.h"
-#include "pb_encode.h"
-#include "pb_decode.h"
+#include "nanopb/pb_common.h"
+#include "nanopb/pb_encode.h"
+#include "nanopb/pb_decode.h"
 
 #include "blockchain.pb.h"
 
@@ -179,12 +179,7 @@ int aergo_esp32_load_account(aergo_account *account){
 // DECODING
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool request_finished = false;
-
 uint8_t null_byte[1] = {0};
-
-unsigned char* to_send = NULL;
-int send_size = 0;
 
 struct blob {
   uint8_t *ptr;
@@ -434,421 +429,294 @@ bool encode_blob(pb_ostream_t *stream, const pb_field_t *field, void * const *ar
 
 uint8_t blockchain_id_hash[32] = {0};
 
-aergo_account *arg_aergo_account;
+bool handle_blockchain_status_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  BlockchainStatus status = BlockchainStatus_init_zero;
 
-struct transaction_receipt *arg_receipt;
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-struct blob arg_str;
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-bool arg_success;
+  /* Set the callback functions */
+  struct blob bb { .ptr = blockchain_id_hash, .size = 32 };
+  status.best_chain_id_hash.arg = &bb;
+  status.best_chain_id_hash.funcs.decode = &read_blob;
 
-int handle_blockchain_status_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, ret;
-        BlockchainStatus status = BlockchainStatus_init_zero;
+  /* Decode the message */
+  if (pb_decode(&stream, BlockchainStatus_fields, &status) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  /* Print the data contained in the message */
+  DEBUG_PRINT_BUFFER("ChainIdHash: ", blockchain_id_hash, sizeof(blockchain_id_hash));
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
-
-        /* Set the callback functions */
-        struct blob bb { .ptr = blockchain_id_hash, .size = 32 };
-        status.best_chain_id_hash.arg = &bb;
-        status.best_chain_id_hash.funcs.decode = &read_blob;
-
-        /* Now we are ready to decode the message */
-        ret = pb_decode(&stream, BlockchainStatus_fields, &status);
-
-        /* Check for errors... */
-        if (!ret) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
-
-        /* Print the data contained in the message */
-        //DEBUG_PRINTF("Block number: %llu\n", block.header.blockNo);
-        DEBUG_PRINT_BUFFER("  + ChainIdHash: ", blockchain_id_hash, sizeof(blockchain_id_hash));
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        request_finished = true;
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_account_state_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, ret;
-        State account_state = State_init_zero;
+bool handle_account_state_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  State account_state = State_init_zero;
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
+  /* Set the callback functions */
 
-        account_state.balance.arg = &arg_aergo_account->balance;
-        account_state.balance.funcs.decode = &read_bignum_to_double;
+  account_state.balance.arg = &request->account->balance;
+  account_state.balance.funcs.decode = &read_bignum_to_double;
 
-        struct blob bb { .ptr = arg_aergo_account->state_root, .size = 32 };
-        account_state.storageRoot.arg = &bb;
-        account_state.storageRoot.funcs.decode = &read_blob;
+  struct blob bb { .ptr = request->account->state_root, .size = 32 };
+  account_state.storageRoot.arg = &bb;
+  account_state.storageRoot.funcs.decode = &read_blob;
 
-        /* Now we are ready to decode the message */
-        ret = pb_decode(&stream, State_fields, &account_state);
+  /* Decode the message */
+  if (pb_decode(&stream, State_fields, &account_state) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* Check for errors... */
-        if (!ret) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  request->account->is_updated = true;
+  request->account->nonce = account_state.nonce;
 
-        arg_aergo_account->is_updated = true;
-        arg_aergo_account->nonce = account_state.nonce;
+  /* Print the data contained in the message */
+  DEBUG_PRINTF("Account Nonce: %llu\n", account_state.nonce);
 
-        /* Print the data contained in the message */
-        DEBUG_PRINTF("Account Nonce: %llu\n", account_state.nonce);
-        //DEBUG_PRINT_BUFFER("  + ChainIdHash: ", storageRoot, sizeof(storageRoot));
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        request_finished = true;
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_block_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, status;
-        Block block = Block_init_zero;
+bool handle_block_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  Block block = Block_init_zero;
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
-        block.header.chainID.funcs.decode = &print_blob;
-        block.header.chainID.arg = (void*)"chainID";
-        block.header.pubKey.funcs.decode = &print_blob;
-        block.header.pubKey.arg = (void*)"pubKey";
-        block.body.txs.funcs.decode = &print_string;
-        block.body.txs.arg = (void*)"txs";
+  /* Set the callback functions */
+  block.header.chainID.funcs.decode = &print_blob;
+  block.header.chainID.arg = (void*)"chainID";
+  block.header.pubKey.funcs.decode = &print_blob;
+  block.header.pubKey.arg = (void*)"pubKey";
+  block.body.txs.funcs.decode = &print_string;
+  block.body.txs.arg = (void*)"txs";
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, Block_fields, &block);
+  /* Decode the message */
+  if (pb_decode(&stream, Block_fields, &block) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* Check for errors... */
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  /* Print the data contained in the message */
+  DEBUG_PRINTF("Block number: %llu\n", block.header.blockNo);
+  DEBUG_PRINTF("Block timestamp: %llu\n", block.header.timestamp);
+  DEBUG_PRINTF("Block confirms: %llu\n", block.header.confirms);
 
-        /* Print the data contained in the message */
-        DEBUG_PRINTF("Block number: %llu\n", block.header.blockNo);
-        DEBUG_PRINTF("Block timestamp: %llu\n", block.header.timestamp);
-        DEBUG_PRINTF("Block confirms: %llu\n", block.header.confirms);
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_transfer_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, status;
-        CommitResultList response = CommitResultList_init_zero;
+bool handle_transfer_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  CommitResultList response = CommitResultList_init_zero;
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
-        //response.results.funcs.decode = &decode_commit_result;
-        //response.results.arg = ...;
+  /* Set the callback functions */
+  //response.results.funcs.decode = &decode_commit_result;
+  //response.results.arg = ...;
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, CommitResultList_fields, &response);
+  /* Decode the message */
+  if (pb_decode(&stream, CommitResultList_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* Check for errors... */
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  /* Print the data contained in the message */
+  DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-        /* Print the data contained in the message */
-        DEBUG_PRINTF("response error status: %u\n", response.results.error);
+  request->status = (response.results.error == CommitStatus_TX_OK);
 
-        arg_success = (response.results.error == CommitStatus_TX_OK);
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        request_finished = true;
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_contract_call_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, status;
-        CommitResultList response = CommitResultList_init_zero;
+bool handle_contract_call_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  CommitResultList response = CommitResultList_init_zero;
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
-        //response.results.funcs.decode = &decode_commit_result;
-        //response.results.arg = ...;
+  /* Set the callback functions */
+  //response.results.funcs.decode = &decode_commit_result;
+  //response.results.arg = ...;
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, CommitResultList_fields, &response);
+  /* Decode the message */
+  if (pb_decode(&stream, CommitResultList_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* Check for errors... */
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  /* Print the data contained in the message */
+  DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-        /* Print the data contained in the message */
-        DEBUG_PRINTF("response error status: %u\n", response.results.error);
+  request->status = (response.results.error == CommitStatus_TX_OK);
 
-        arg_success = (response.results.error == CommitStatus_TX_OK);
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        request_finished = true;
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_query_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        int i, status;
-        SingleBytes response = SingleBytes_init_zero;
+bool handle_query_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  SingleBytes response = SingleBytes_init_zero;
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
-        response.value.arg = &arg_str;
-        response.value.funcs.decode = &read_string;
+  /* Set the callback functions */
+  struct blob s1 { .ptr = (uint8_t*) request->return, .size = request->return_len };
+  response.value.arg = &s1;
+  response.value.funcs.decode = &read_string;
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, SingleBytes_fields, &response);
+  /* Decode the message */
+  if (pb_decode(&stream, SingleBytes_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* Check for errors... */
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  request->status = true;
 
-        arg_success = true;
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        request_finished = true;
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-contract_event_cb arg_contract_event_cb = NULL;
+bool handle_event_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  Event response = Event_init_zero;
+  contract_event event = {0};
+  char raw_address[64];
 
-int handle_event_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        Event response = Event_init_zero;
-        contract_event event = {0};
-        char raw_address[64];
-        int status;
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        if (arg_contract_event_cb==NULL) {
-          DEBUG_PRINTLN("STREAM CLOSED");
-          request_finished = true;
-          return 0;
-        }
+  /* Set the callback functions */
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
+  response.contractAddress.arg = &s1;
+  response.contractAddress.funcs.decode = &read_blob;
 
-        /* Set the callback functions */
+  struct blob s2 { .ptr = (uint8_t*) event.eventName, .size = sizeof event.eventName };
+  response.eventName.arg = &s2;
+  response.eventName.funcs.decode = &read_string;
 
-        struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
-        response.contractAddress.arg = &s1;
-        response.contractAddress.funcs.decode = &read_blob;
+  struct blob s3 { .ptr = (uint8_t*) event.jsonArgs, .size = sizeof event.jsonArgs };
+  response.jsonArgs.arg = &s3;
+  response.jsonArgs.funcs.decode = &read_string;
 
-        struct blob s2 { .ptr = (uint8_t*) event.eventName, .size = sizeof event.eventName };
-        response.eventName.arg = &s2;
-        response.eventName.funcs.decode = &read_string;
+  struct blob b1 { .ptr = (uint8_t*) event.txHash, .size = sizeof event.txHash };
+  response.txHash.arg = &b1;
+  response.txHash.funcs.decode = &read_blob;
 
-        struct blob s3 { .ptr = (uint8_t*) event.jsonArgs, .size = sizeof event.jsonArgs };
-        response.jsonArgs.arg = &s3;
-        response.jsonArgs.funcs.decode = &read_string;
+  struct blob b2 { .ptr = (uint8_t*) event.blockHash, .size = sizeof event.blockHash };
+  response.blockHash.arg = &b2;
+  response.blockHash.funcs.decode = &read_blob;
 
-        struct blob b1 { .ptr = (uint8_t*) event.txHash, .size = sizeof event.txHash };
-        response.txHash.arg = &b1;
-        response.txHash.funcs.decode = &read_blob;
+  /* Decode the message */
+  if (pb_decode(&stream, Event_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        struct blob b2 { .ptr = (uint8_t*) event.blockHash, .size = sizeof event.blockHash };
-        response.blockHash.arg = &b2;
-        response.blockHash.funcs.decode = &read_blob;
+  /* encode the contract address from binary to string format */
+  encode_address(raw_address, AddressLength, event.contractAddress, sizeof event.contractAddress);
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, Event_fields, &response);
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  /* copy values */
+  event.eventIdx = response.eventIdx;
+  event.blockNo = response.blockNo;
+  event.txIndex = response.txIndex;
 
-        /* encode the contract address from binary to string format */
-        encode_address(raw_address, AddressLength, event.contractAddress, sizeof event.contractAddress);
+  /* Call the callback function */
+  contract_event_cb callback = request->callback;
+  callback(request->arg, &event);
 
-        /* copy values */
-        event.eventIdx = response.eventIdx;
-        event.blockNo = response.blockNo;
-        event.txIndex = response.txIndex;
-
-        /* Call the callback function */
-        arg_contract_event_cb(&event);
-
-        arg_success = true;
-
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
 
-int handle_receipt_response(struct sh2lib_handle *handle, const char *data, size_t len, int flags) {
-    if (len > 0) {
-        Receipt response = Receipt_init_zero;
-        transaction_receipt *receipt = arg_receipt;
-        char raw_address[64];
-        int status;
+bool handle_receipt_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  Receipt response = Receipt_init_zero;
+  transaction_receipt *receipt = (transaction_receipt *) request->return;
+  char raw_address[64];
 
-        memset(receipt, 0, sizeof(struct transaction_receipt));
+  memset(receipt, 0, sizeof(struct transaction_receipt));
 
-        DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("returned", data, len);
 
-        /* Create a stream that reads from the buffer */
-        pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
-        /* Set the callback functions */
+  /* Set the callback functions */
 
-        struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
-        response.contractAddress.arg = &s1;
-        response.contractAddress.funcs.decode = &read_blob;
+  struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
+  response.contractAddress.arg = &s1;
+  response.contractAddress.funcs.decode = &read_blob;
 
-        struct blob s2 { .ptr = (uint8_t*) receipt->status, .size = sizeof receipt->status };
-        response.status.arg = &s2;
-        response.status.funcs.decode = &read_string;
+  struct blob s2 { .ptr = (uint8_t*) receipt->status, .size = sizeof receipt->status };
+  response.status.arg = &s2;
+  response.status.funcs.decode = &read_string;
 
-        struct blob s3 { .ptr = (uint8_t*) receipt->ret, .size = sizeof receipt->ret };
-        response.ret.arg = &s3;
-        response.ret.funcs.decode = &read_string;
+  struct blob s3 { .ptr = (uint8_t*) receipt->ret, .size = sizeof receipt->ret };
+  response.ret.arg = &s3;
+  response.ret.funcs.decode = &read_string;
 
-        struct blob b1 { .ptr = (uint8_t*) receipt->txHash, .size = sizeof receipt->txHash };
-        response.txHash.arg = &b1;
-        response.txHash.funcs.decode = &read_blob;
+  struct blob b1 { .ptr = (uint8_t*) receipt->txHash, .size = sizeof receipt->txHash };
+  response.txHash.arg = &b1;
+  response.txHash.funcs.decode = &read_blob;
 
-        struct blob b2 { .ptr = (uint8_t*) receipt->blockHash, .size = sizeof receipt->blockHash };
-        response.blockHash.arg = &b2;
-        response.blockHash.funcs.decode = &read_blob;
+  struct blob b2 { .ptr = (uint8_t*) receipt->blockHash, .size = sizeof receipt->blockHash };
+  response.blockHash.arg = &b2;
+  response.blockHash.funcs.decode = &read_blob;
 
-        response.feeUsed.arg = &receipt->feeUsed;
-        response.feeUsed.funcs.decode = &read_bignum_to_double;
+  response.feeUsed.arg = &receipt->feeUsed;
+  response.feeUsed.funcs.decode = &read_bignum_to_double;
 
-        /* Now we are ready to decode the message */
-        status = pb_decode(&stream, Receipt_fields, &response);
-        if (!status) {
-            DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-            return 1;
-        }
+  /* Decode the message */
+  if (pb_decode(&stream, Receipt_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
 
-        /* encode the contract address from binary to string format */
-        encode_address(raw_address, AddressLength, receipt->contractAddress, sizeof receipt->contractAddress);
+  /* encode the contract address from binary to string format */
+  encode_address(raw_address, AddressLength, receipt->contractAddress, sizeof receipt->contractAddress);
 
-        /* copy values */
-        receipt->gasUsed = response.gasUsed;
-        receipt->blockNo = response.blockNo;
-        receipt->txIndex = response.txIndex;
-        receipt->feeDelegation = response.feeDelegation;
+  /* copy values */
+  receipt->gasUsed = response.gasUsed;
+  receipt->blockNo = response.blockNo;
+  receipt->txIndex = response.txIndex;
+  receipt->feeDelegation = response.feeDelegation;
 
-        arg_success = true;
+  request->status = true;
 
-    } else {
-        DEBUG_PRINTLN("returned 0 bytes");
-    }
-
-    if (flags == DATA_RECV_FRAME_COMPLETE) {
-        DEBUG_PRINTLN("COMPLETE FRAME RECEIVED");
-    } else if (flags == DATA_RECV_RST_STREAM) {
-        request_finished = true;
-        DEBUG_PRINTLN("STREAM CLOSED");
-    }
-    return 0;
+  return true;
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // AERGO SPECIFIC
@@ -995,7 +863,7 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   message.body.sign.funcs.encode = &encode_blob;
 
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode_submessage(stream, Tx_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(stream));
@@ -1014,7 +882,7 @@ bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct t
   message.txs.arg = txn;
   message.txs.funcs.encode = &encode_1_transaction;
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, TxList_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1110,7 +978,7 @@ bool EncodeQuery(uint8_t *buffer, size_t *psize, char *contract_address, char *q
   message.queryinfo.funcs.encode = &encode_string;
   message.queryinfo.arg = query_info;
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, Query_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1178,7 +1046,7 @@ bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, mbedtls_ecdsa_context 
   message.value.funcs.encode = &encode_ecdsa_address;
   message.value.arg = account;
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, SingleBytes_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1205,7 +1073,7 @@ bool EncodeTxnHash(uint8_t *buffer, size_t *psize, char *txn_hash){
   message.value.arg = &bb;
   message.value.funcs.encode = &encode_blob;
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, SingleBytes_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1233,7 +1101,7 @@ bool EncodeBlockNo(uint8_t *buffer, size_t *psize, uint64_t blockNo){
   message.value.funcs.encode = &encode_fixed64;
   message.value.arg = &blockNo;
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, SingleBytes_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1255,7 +1123,7 @@ bool EncodeEmptyMessage(uint8_t *buffer, size_t *psize){
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
-  /* Now we are ready to decode the message */
+  /* Decode the message */
   bool status = pb_encode(&stream, Empty_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
@@ -1268,73 +1136,6 @@ bool EncodeEmptyMessage(uint8_t *buffer, size_t *psize){
 
   *psize = size;
   return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// HTTP2 AND GRPC
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size){
-  // no compression
-  buffer[0] = 0;
-  // insert the size in the stream as big endian 32-bit integer
-  copy_be32((uint32_t*)&buffer[1], &content_size);
-  // return the frame size
-  return content_size + 5;
-}
-
-int send_post_data(struct sh2lib_handle *handle, char *buf, size_t length, uint32_t *data_flags){
-  int copylen = send_size;
-  int i;
-
-  DEBUG_PRINTF("send_post_data length=%d\n", length);
-
-  if (copylen <= length) {
-    memcpy(buf, to_send, copylen);
-  } else {
-    copylen = 0;
-  }
-
-  DEBUG_PRINT_BUFFER("sending", buf, copylen);
-
-  (*data_flags) |= NGHTTP2_DATA_FLAG_EOF;
-  return copylen;
-}
-
-void send_grpc_request(struct sh2lib_handle *hd, char *service, uint8_t *buffer, size_t size, sh2lib_frame_data_recv_cb_t response_callback) {
-  char path[64];
-  char len[8];
-
-  to_send = buffer;
-  send_size = size;
-
-  sprintf(path, "/types.AergoRPCService/%s", service);
-  sprintf(len, "%d", size);
-
-  const nghttp2_nv nva[] = {
-    SH2LIB_MAKE_NV(":method", "POST"),
-    SH2LIB_MAKE_NV(":scheme", "https"),
-    SH2LIB_MAKE_NV(":authority", hd->hostname),
-    SH2LIB_MAKE_NV(":path", path),
-    //SH2LIB_MAKE_NV("te", "trailers"),
-    SH2LIB_MAKE_NV("Content-Type", "application/grpc"),
-    //SH2LIB_MAKE_NV("grpc-encoding", "identity")
-    SH2LIB_MAKE_NV("content-length", len)
-  };
-
-  request_finished = false;
-  sh2lib_do_putpost_with_nv(hd, nva, sizeof(nva) / sizeof(nva[0]), send_post_data, response_callback);
-
-  while (!request_finished) {
-    DEBUG_PRINTLN("sh2lib_execute");
-    if (sh2lib_execute(hd) != ESP_OK) {
-      DEBUG_PRINTLN("Error in execute");
-      break;
-    }
-    vTaskDelay(25);
-  }
-
-  DEBUG_PRINTLN("Request done. returning");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1352,81 +1153,189 @@ bool check_blockchain_id_hash(aergo *instance) {
 // EXPORTED FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool aergo_transfer_bignum(aergo *instance, char *txn_hash, aergo_account *from_account, char *to_account, char *amount, int len){
-  uint8_t buffer[1024];
+static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *amount, int len){
+  uint8_t buffer[1024], txn_hash[32];
   size_t size;
+  struct request *request = NULL;
+  bool status = false;
+
+  if (!instance || !account || !to_account || !amount || len <= 0) return false;
 
   if (check_blockchain_id_hash(instance) == false) return false;
 
   // check if nonce was retrieved
-  if ( !from_account->is_updated ){
-    if ( aergo_get_account_state(instance, from_account) == false ) return false;
+  if (!from_account->is_updated) {
+    if (aergo_get_account_state(instance, from_account) == false) return false;
   }
 
-  arg_success = false;
   size = sizeof(buffer);
-  if (EncodeTransfer(buffer, &size, txn_hash, from_account, to_account, amount, len)){
-    arg_aergo_account = from_account;
-    send_grpc_request(&instance->hd, "CommitTX", buffer, size, handle_transfer_response);
+  if (EncodeTransfer(buffer, &size, txn_hash, from_account, to_account, amount, len) == false) {
+    goto loc_failed;
   }
 
-  return arg_success;
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  memcpy(request->txn_hash, txn_hash, 32);
+  request->callback = cb;
+  request->arg = arg;
+  request->return = receipt;
+
+  if (send_grpc_request(instance, "CommitTX", request, handle_transfer_response) == false) {
+    goto loc_failed;
+  }
+
+  if (request->callback) {
+    return true;
+  } else {
+    int status = request->status;
+    free_request(instance, request);
+    return status;
+  }
+loc_failed:
+  free_request(instance, request);
+  return false;
 }
 
-bool aergo_transfer_str(aergo *instance, char *txn_hash, aergo_account *from_account, char *to_account, char *value){
+bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *amount, int len){
+  //if (!receipt) return false; -- do not ask for a txn receipt
+  return aergo_transfer_bignum__int(instance, NULL, NULL, receipt, from_account, to_account, amount, len);
+}
+
+bool aergo_transfer_bignum_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, char *to_account, char *amount, int len){
+  if (!cb) return false;
+  return aergo_transfer_bignum__int(instance, cb, arg, NULL, from_account, to_account, amount, len);
+}
+
+bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *value){
   char buf[16];
   int len;
 
   len = string_to_bignum(value, strlen(value), buf, sizeof(buf));
 
-  return aergo_transfer_bignum(instance, txn_hash, from_account, to_account, buf, len);
-
+  return aergo_transfer_bignum(instance, receipt, from_account, to_account, buf, len);
 }
 
-bool aergo_transfer(aergo *instance, char *txn_hash, aergo_account *from_account, char *to_account, double value){
+bool aergo_transfer_str_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, char *to_account, char *value){
+  char buf[16];
+  int len;
+
+  len = string_to_bignum(value, strlen(value), buf, sizeof(buf));
+
+  return aergo_transfer_bignum_async(instance, cb, arg, from_account, to_account, buf, len);
+}
+
+bool aergo_transfer(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, double value){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str), "%f", value);
 
-  return aergo_transfer_str(instance, txn_hash, from_account, to_account, amount_str);
-
+  return aergo_transfer_str(instance, receipt, from_account, to_account, amount_str);
 }
 
-bool aergo_transfer_int(aergo *instance, char *txn_hash, aergo_account *from_account, char *to_account, uint64_t integer, uint64_t decimal){
+bool aergo_transfer_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, char *to_account, double value){
+  char amount_str[36];
+
+  snprintf(amount_str, sizeof(amount_str), "%f", value);
+
+  return aergo_transfer_str_async(instance, cb, arg, from_account, to_account, amount_str);
+}
+
+bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, uint64_t integer, uint64_t decimal){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str),
            "%lld.%018lld", integer, decimal);
 
-  return aergo_transfer_str(instance, txn_hash, from_account, to_account, amount_str);
-
+  return aergo_transfer_str(instance, receipt, from_account, to_account, amount_str);
 }
 
-bool aergo_call_smart_contract_json(aergo *instance, char *txn_hash, aergo_account *account, char *contract_address, char *function, char *args){
-  uint8_t call_info[512], buffer[1024];
+bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, char *to_account, uint64_t integer, uint64_t decimal){
+  char amount_str[36];
+
+  snprintf(amount_str, sizeof(amount_str),
+           "%lld.%018lld", integer, decimal);
+
+  return aergo_transfer_str_async(instance, cb, arg, from_account, to_account, amount_str);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, char *contract_address, char *function, char *args){
+  uint8_t *call_info=NULL, *buffer=NULL, txn_hash[32];
   size_t size;
+  struct request *request = NULL;
+  bool status = false;
+
+  if (!instance || !account || !contract_address || !function) return false;
 
   if (check_blockchain_id_hash(instance) == false) return false;
 
   // check if nonce was retrieved
-  if ( !account->is_updated ){
-    if ( aergo_get_account_state(instance, account) == false ) return false;
+  if (!account->is_updated) {
+    if (aergo_get_account_state(instance, account) == false) return false;
   }
 
-  snprintf(call_info, sizeof(call_info),
-           "{\"Name\":\"%s\", \"Args\":%s}", function, args);
+  size = strlen(function) + strlen(args);
+  call_info = malloc(size + 32);
+  buffer = malloc(size + 256);
+  if (!call_info || !buffer) goto loc_failed;
 
-  arg_success = false;
-  size = sizeof(buffer);
-  if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, account)){
-    arg_aergo_account = account;
-    send_grpc_request(&instance->hd, "CommitTX", buffer, size, handle_contract_call_response);
+  if (args) {
+    snprintf(call_info, size + 32,
+            "{\"Name\":\"%s\", \"Args\":%s}", function, args);
+  } else {
+    snprintf(call_info, size + 32,
+            "{\"Name\":\"%s\"}", function);
   }
 
-  return arg_success;
+  size += 256;
+  if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, account)) {
+    goto loc_failed;
+  }
+
+  request = new_request(instance);
+  if (!request) goto loc_failed;
+
+  request->data = buffer;
+  request->size = size;
+  memcpy(request->txn_hash, txn_hash, 32);
+  request->callback = cb;
+  request->arg = arg;
+  request->return = receipt;
+
+  if (send_grpc_request(instance, "CommitTX", request, handle_contract_call_response) == false) {
+    goto loc_failed;
+  }
+
+  if (request->callback) {
+    status = true;
+  } else {
+    status = request->status;
+    free_request(instance, request);
+  }
+loc_exit:
+  if (call_info) free(call_info);
+  if (buffer   ) free(buffer   );
+  return status;
+loc_failed:
+  free_request(instance, request);
+  goto loc_exit;
 }
 
-bool aergo_call_smart_contract(aergo *instance, char *txn_hash, aergo_account *account, char *contract_address, char *function, char *types, ...){
+bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receipt, aergo_account *account, char *contract_address, char *function, char *args){
+  if (!receipt) return false;
+  return aergo_call_smart_contract__int(instance, NULL, NULL, receipt, account, contract_address, function, args);
+}
+
+bool aergo_call_smart_contract_json_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, char *contract_address, char *function, char *args){
+  if (!cb) return false;
+  return aergo_call_smart_contract__int(instance, cb, arg, NULL, account, contract_address, function, args);
+}
+
+bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, aergo_account *account, char *contract_address, char *function, char *types, ...){
   uint8_t args[512];
   va_list ap;
   bool ret;
@@ -1436,31 +1345,85 @@ bool aergo_call_smart_contract(aergo *instance, char *txn_hash, aergo_account *a
   va_end(ap);
   if (ret == false) return false;
 
-  return aergo_call_smart_contract_json(instance, txn_hash, account, contract_address, function, args);
+  return aergo_call_smart_contract_json(instance, receipt, account, contract_address, function, args);
 }
 
-bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, char *contract_address, char *function, char *args){
-  uint8_t query_info[512], buffer[512];
+bool aergo_call_smart_contract_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, char *contract_address, char *function, char *types, ...){
+  uint8_t args[512];
+  va_list ap;
+  bool ret;
+
+  va_start(ap, types);
+  ret = arguments_to_json(args, sizeof(args), types, ap);
+  va_end(ap);
+  if (ret == false) return false;
+
+  return aergo_call_smart_contract_json_async(instance, cb, arg, account, contract_address, function, args);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contract_cb cb, void *arg, char *result, int resultlen, char *contract_address, char *function, char *args){
+  uint8_t *query_info=NULL, *buffer=NULL, txn_hash[32];
   size_t size;
+  struct request *request = NULL;
+  bool status = false;
+
+  if (!instance || !contract_address || !function) return false;
+
+  size = strlen(function) + strlen(args);
+  query_info = malloc(size + 32);
+  buffer = malloc(size + 256);
+  if (!query_info || !buffer) goto loc_failed;
 
   if (args) {
-    snprintf(query_info, sizeof(query_info),
+    snprintf(query_info, size + 32,
             "{\"Name\":\"%s\", \"Args\":%s}", function, args);
   } else {
-    snprintf(query_info, sizeof(query_info),
+    snprintf(query_info, size + 32,
             "{\"Name\":\"%s\"}", function);
   }
 
-  arg_str.ptr = result;
-  arg_str.size = resultlen;
-  arg_success = false;
+  size += 256;
+  if (EncodeQuery(buffer, &size, contract_address, query_info)) goto loc_failed;
 
-  size = sizeof(buffer);
-  if (EncodeQuery(buffer, &size, contract_address, query_info)){
-    send_grpc_request(&instance->hd, "QueryContract", buffer, size, handle_query_response);
+  request = new_request(instance);
+  if (!request) goto loc_failed;
+
+  request->data = buffer;
+  request->size = size;
+  request->callback = cb;
+  request->arg = arg;
+  request->return = result;
+  request->return_len = resultlen;
+
+  if (send_grpc_request(instance, "QueryContract", request, handle_query_response) == false) {
+    goto loc_failed;
   }
 
-  return arg_success;
+  if (request->callback) {
+    status = true;
+  } else {
+    status = request->status;
+    free_request(instance, request);
+  }
+loc_exit:
+  if (query_info) free(query_info);
+  if (buffer    ) free(buffer    );
+  return status;
+loc_failed:
+  free_request(instance, request);
+  goto loc_exit;
+}
+
+bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, char *contract_address, char *function, char *args){
+  if (!result || resultlen <= 0) return false;
+  return aergo_query_smart_contract__int(instance, NULL, NULL, result, resultlen, contract_address, function, args);
+}
+
+bool aergo_query_smart_contract_json_async(aergo *instance, query_smart_contract_cb cb, void *arg, char *contract_address, char *function, char *args){
+  if (!cb) return false;
+  return aergo_query_smart_contract__int(instance, cb, arg, NULL, 0, contract_address, function, args);
 }
 
 bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, char *contract_address, char *function, char *types, ...){
@@ -1481,37 +1444,105 @@ bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, ch
   return aergo_query_smart_contract_json(instance, result, resultlen, contract_address, function, pargs);
 }
 
-bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, char *event_name, contract_event_cb cb){
-  uint8_t buffer[256];
-  size_t size;
+bool aergo_query_smart_contract_async(aergo *instance, query_smart_contract_cb cb, void *arg, char *contract_address, char *function, char *types, ...){
+  uint8_t args[512], *pargs;
+  va_list ap;
+  bool ret;
 
-  arg_contract_event_cb = cb;
-  arg_success = false;
-
-  size = sizeof(buffer);
-  if (EncodeFilterInfo(buffer, &size, contract_address, event_name)){
-    send_grpc_request(&instance->hd, "ListEventStream", buffer, size, handle_event_response);
+  if (types && types[0]) {
+    va_start(ap, types);
+    ret = arguments_to_json(args, sizeof(args), types, ap);
+    va_end(ap);
+    if (ret == false) return false;
+    pargs = args;
+  } else {
+    pargs = NULL;
   }
 
-  return arg_success;
+  return aergo_query_smart_contract_json_async(instance, cb, args, contract_address, function, pargs);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, char *event_name, contract_event_cb cb, void *arg){
+  uint8_t buffer[256];
+  size_t size;
+  struct request *request = NULL;
+
+  if (!instance || !contract_address || !event_name || !cb) return false;
+
+  size = sizeof(buffer);
+  if (EncodeFilterInfo(buffer, &size, contract_address, event_name) == false){
+    return false;
+  }
+
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  request->callback = cb;
+  request->arg = arg;
+
+  if (send_grpc_request(instance, "ListEventStream", request, handle_event_response) == false){
+    goto loc_failed;
+  }
+
+  return true;
+loc_failed:
+  free_request(instance, request);
+  return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt){
+  uint8_t buffer[256];
+  size_t size;
+  struct request *request = NULL;
+
+  if (!instance || !txn_hash) return false;
+
+  size = sizeof(buffer);
+  if (EncodeTxnHash(buffer, &size, txn_hash) == false) goto loc_failed;
+
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  memcpy(request->txn_hash, txn_hash, 32);
+  request->callback = cb;
+  request->arg = arg;
+  request->return = receipt;
+
+  if (send_grpc_request(instance, "GetReceipt", request, handle_receipt_response) == false) {
+    goto loc_failed;
+  }
+
+  if (request->callback) {
+    return true;
+  } else {
+    int status = request->status;
+    free_request(instance, request);
+    return status;
+  }
+loc_failed:
+  free_request(instance, request);
+  return false;
 }
 
 bool aergo_get_receipt(aergo *instance, char *txn_hash, struct transaction_receipt *receipt){
-  uint8_t buffer[256];
-  size_t size;
-
-  if (!instance || !txn_hash || !receipt) return false;
-
-  arg_receipt = receipt;
-  arg_success = false;
-
-  size = sizeof(buffer);
-  if (EncodeTxnHash(buffer, &size, txn_hash)){
-    send_grpc_request(&instance->hd, "GetReceipt", buffer, size, handle_receipt_response);
-  }
-
-  return arg_success;
+  if (!receipt) return false;
+  return aergo_get_receipt__int(instance, txn_hash, NULL, NULL, receipt);
 }
+
+bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receipt_cb cb, void *arg){
+  if (!cb) return false;
+  return aergo_get_receipt__int(instance, txn_hash, cb, arg, NULL);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void aergo_get_block(aergo *instance, uint64_t blockNo){
   uint8_t buffer[128];
@@ -1519,21 +1550,41 @@ void aergo_get_block(aergo *instance, uint64_t blockNo){
 
   size = sizeof(buffer);
   if (EncodeBlockNo(buffer, &size, blockNo)){
-    send_grpc_request(&instance->hd, "GetBlockMetadata", buffer, size, handle_block_response);
+    send_grpc_request(instance, "GetBlockMetadata", buffer, size, handle_block_response);
   }
 
 }
 
-void aergo_block_stream_subscribe(aergo *instance){
-  uint8_t buffer[128];
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool aergo_block_stream_subscribe(aergo *instance){
+  uint8_t buffer[32];
   size_t size;
+  struct request *request = NULL;
+
+  if (!instance || !cb) return false;
 
   size = sizeof(buffer);
-  if (EncodeEmptyMessage(buffer, &size)){
-    send_grpc_request(&instance->hd, "ListBlockStream", buffer, size, handle_block_response);
+  if (EncodeEmptyMessage(buffer, &size) == false) return false;
+
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  request->callback = cb;
+
+  if (send_grpc_request(instance, "ListBlockStream", request, handle_block_response) == false) {
+    goto loc_failed;
   }
 
+  return true;
+loc_failed:
+  free_request(instance, request);
+  return false;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void aergo_get_blockchain_status(aergo *instance){
   uint8_t buffer[128];
@@ -1541,31 +1592,48 @@ void aergo_get_blockchain_status(aergo *instance){
 
   size = sizeof(buffer);
   if (EncodeEmptyMessage(buffer, &size)){
-    send_grpc_request(&instance->hd, "Blockchain", buffer, size, handle_blockchain_status_response);
+    send_grpc_request(instance, "Blockchain", buffer, size, handle_blockchain_status_response);
   }
 
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool aergo_get_account_state(aergo *instance, aergo_account *account){
   uint8_t buffer[128];
   size_t size;
 
+  if (!instance || !account) return false;
+
   account->is_updated = false;
 
   size = sizeof(buffer);
-  if (EncodeAccountAddress(buffer, &size, &account->keypair)){
-    arg_aergo_account = account;
-    send_grpc_request(&instance->hd, "GetState", buffer, size, handle_account_state_response);
+  if (EncodeAccountAddress(buffer, &size, &account->keypair)) {
+    return false;
   }
+
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  request->account = account;
+
+  if (send_grpc_request(instance, "GetState", request, handle_account_state_response) == false) goto loc_failed;
 
   // copy values to the account structure
 
   copy_ecdsa_address(&account->keypair, buffer, sizeof buffer);
   encode_address(buffer, AddressLength, account->address, sizeof account->address);
 
+  free_request(instance, request);
   return account->is_updated;
+loc_failed:
+  free_request(instance, request);
+  return false;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 int aergo_connect(aergo *instance, char *host) {
