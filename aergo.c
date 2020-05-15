@@ -1,6 +1,8 @@
 #include "aergo.h"
 #include "aergo-int.h"
 
+#include "stdarg.h"
+
 #include "nanopb/pb_common.h"
 #include "nanopb/pb_encode.h"
 #include "nanopb/pb_decode.h"
@@ -11,169 +13,34 @@
 #include "conversions.h"
 #include "account.h"
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+#include "socket.c"
 
-#pragma GCC diagnostic warning "-fpermissive"
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //#define DEBUG_MESSAGES 1
 
 #if defined(DEBUG_MESSAGES)
 #define DEBUG_PRINTF     printf
-#define DEBUG_PRINTLN    println
 #define DEBUG_PRINT_BUFFER print_buffer
 #else
 #define DEBUG_PRINTF(...)
-#define DEBUG_PRINTLN(...)
 #define DEBUG_PRINT_BUFFER(...)
 #endif
-
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
-
-#if defined(MBEDTLS_PLATFORM_C)
-#include "mbedtls/platform.h"
-#else
-#include <stdio.h>
-#include <stdlib.h>
-#define mbedtls_exit       exit
-#define mbedtls_printf     DEBUG_PRINTF
-//#define mbedtls_snprintf   snprintf
-#define mbedtls_free       free
-#define mbedtls_exit            exit
-#define MBEDTLS_EXIT_SUCCESS    EXIT_SUCCESS
-#define MBEDTLS_EXIT_FAILURE    EXIT_FAILURE
-#endif
-
-#include "mbedtls/ecdsa.h"
-#include "mbedtls/ecdh.h"
-#include "mbedtls/error.h"
-
-static int ecdsa_rand(void *rng_state, unsigned char *output, size_t len){
-
-#if 0
-  while( len > 0 ){
-    int rnd;
-    size_t use_len = len;
-    if( use_len > sizeof(int) )
-      use_len = sizeof(int);
-
-    rnd = rand();
-    memcpy( output, &rnd, use_len );
-    output += use_len;
-    len -= use_len;
-  }
-#endif
-
-  esp_fill_random(output, len);
-  return 0;
-}
 
 static void print_buffer(const char *title, unsigned char *data, size_t len){
   size_t i;
   DEBUG_PRINTF("%s (%d bytes) ", title, len);
   for(i=0; i<len; i++){
     DEBUG_PRINTF(" %02x", data[i]);
-    if(i % 16 == 15) DEBUG_PRINTLN("");
+    if(i % 16 == 15) DEBUG_PRINTF("\n");
   }
-  DEBUG_PRINTLN("");
+  DEBUG_PRINTF("\n");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE KEY STORAGE
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <EEPROM.h>
-
-#define EACH         64
-#define EEPROM_SIZE  (4 * EACH) + 2
-
-int aergo_esp32_load_account(aergo_account *account){
-  const mbedtls_ecp_curve_info *curve_info = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1);
-  mbedtls_ecdsa_context *keypair;
-  unsigned char buf[EEPROM_SIZE];
-  int rc, base, i;
-
-  if( !account ) return -2;
-
-  keypair = &account->keypair;
-  mbedtls_ecdsa_init(keypair);
-
-  /* read data from EPROM */
-  if (!EEPROM.begin(EEPROM_SIZE)){
-    DEBUG_PRINTLN("failed to initialise EEPROM");
-    return -1;
-  }
-
-  if( EEPROM.read(0)!=53 || EEPROM.read(1)!=79 ){
-    DEBUG_PRINTLN("invalid values at EEPROM. generating a new private key");
-    goto loc_notset;
-  }
-  base = 2;
-
-  for (i=0; i<EEPROM_SIZE-base; i++) {
-    buf[i] = EEPROM.read(base+i);
-  }
-
-  /* check if  */
-  mbedtls_ecp_group_load(&keypair->grp, MBEDTLS_ECP_DP_SECP256K1);
-
-  rc = mbedtls_mpi_read_binary(&keypair->d, buf, EACH);
-  if (rc) {
-    DEBUG_PRINTLN("failed read private key. probably invalid. generating a new one");
-    goto loc_notset;
-  }
-  rc = mbedtls_mpi_read_binary(&keypair->Q.X, &buf[EACH], EACH);
-  if (rc) {
-    DEBUG_PRINTLN("failed read public key X. probably invalid. generating a new one");
-    goto loc_notset;
-  }
-  rc = mbedtls_mpi_read_binary(&keypair->Q.Y, &buf[EACH*2], EACH);
-  if (rc) {
-    DEBUG_PRINTLN("failed read public key Y. probably invalid. generating a new one");
-    goto loc_notset;
-  }
-  rc = mbedtls_mpi_read_binary(&keypair->Q.Z, &buf[EACH*3], EACH);
-  if (rc) {
-    DEBUG_PRINTLN("failed read public key Z. probably invalid. generating a new one");
-    goto loc_notset;
-  }
-
-
-  if (rc) {
-    DEBUG_PRINTLN("failed read private key. probably invalid. generating a new one");
-    loc_notset:
-
-    /* generate a new private key */
-    rc = mbedtls_ecdsa_genkey(keypair, curve_info->grp_id, ecdsa_rand, NULL);
-    if (rc) return rc;
-
-    /* store the private key on the EPROM */
-    rc = mbedtls_mpi_write_binary(&keypair->d, buf, EACH);
-    if (rc) return rc;
-    rc = mbedtls_mpi_write_binary(&keypair->Q.X, &buf[EACH], EACH);
-    if (rc) return rc;
-    rc = mbedtls_mpi_write_binary(&keypair->Q.Y, &buf[EACH*2], EACH);
-    if (rc) return rc;
-    rc = mbedtls_mpi_write_binary(&keypair->Q.Z, &buf[EACH*3], EACH);
-    if (rc) return rc;
-
-    DEBUG_PRINTF("writting the private key to EEPROM.");
-    EEPROM.write(0, 53);
-    EEPROM.write(1, 79);
-    for (i=0; i<EEPROM_SIZE-2; i++) {
-      EEPROM.write(i+2, buf[i]);
-      DEBUG_PRINTF(".");
-    }
-    EEPROM.commit();
-    DEBUG_PRINTLN(" done");
-
-  }
-
-  return 0;
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // DECODING
@@ -214,7 +81,7 @@ bool read_string(pb_istream_t *stream, const pb_field_t *field, void **arg){
     DEBUG_PRINTF("read_string bytes_left=%d str->size=%d\n", stream->bytes_left, str->size);
 
     /* We could read block-by-block to avoid the large buffer... */
-    if (stream->bytes_left > str->size || stream->bytes_left < 0){
+    if (stream->bytes_left > str->size){
         DEBUG_PRINTF("FAILED! read_string\n");
         return false;
     }
@@ -292,7 +159,7 @@ bool read_bignum_to_double(pb_istream_t *stream, const pb_field_t *field, void *
     DEBUG_PRINTF("read_bignum_to_double - string value = %s\n", buf);
 
     // convert the value from string to double
-    *pvalue = atof(buf);
+    *pvalue = atof((char*)buf);
 
     DEBUG_PRINTF("read_bignum_to_double ok - value = %f\n", *pvalue);
     return true;
@@ -440,7 +307,7 @@ bool handle_blockchain_status_response(aergo *instance, struct request *request)
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
   /* Set the callback functions */
-  struct blob bb { .ptr = blockchain_id_hash, .size = 32 };
+  struct blob bb = { .ptr = blockchain_id_hash, .size = 32 };
   status.best_chain_id_hash.arg = &bb;
   status.best_chain_id_hash.funcs.decode = &read_blob;
 
@@ -453,6 +320,7 @@ bool handle_blockchain_status_response(aergo *instance, struct request *request)
   /* Print the data contained in the message */
   DEBUG_PRINT_BUFFER("ChainIdHash: ", blockchain_id_hash, sizeof(blockchain_id_hash));
 
+  request->success = true;
   return true;
 }
 
@@ -471,7 +339,7 @@ bool handle_account_state_response(aergo *instance, struct request *request) {
   account_state.balance.arg = &request->account->balance;
   account_state.balance.funcs.decode = &read_bignum_to_double;
 
-  struct blob bb { .ptr = request->account->state_root, .size = 32 };
+  struct blob bb = { .ptr = request->account->state_root, .size = 32 };
   account_state.storageRoot.arg = &bb;
   account_state.storageRoot.funcs.decode = &read_blob;
 
@@ -545,7 +413,7 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  request->status = (response.results.error == CommitStatus_TX_OK);
+  request->success = (response.results.error == CommitStatus_TX_OK);
 
   return true;
 }
@@ -573,7 +441,7 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  request->status = (response.results.error == CommitStatus_TX_OK);
+  request->success = (response.results.error == CommitStatus_TX_OK);
 
   return true;
 }
@@ -589,7 +457,7 @@ bool handle_query_response(aergo *instance, struct request *request) {
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
   /* Set the callback functions */
-  struct blob s1 { .ptr = (uint8_t*) request->return, .size = request->return_len };
+  struct blob s1 = { .ptr = (uint8_t*) request->return_ptr, .size = request->return_size };
   response.value.arg = &s1;
   response.value.funcs.decode = &read_string;
 
@@ -599,7 +467,7 @@ bool handle_query_response(aergo *instance, struct request *request) {
     return false;
   }
 
-  request->status = true;
+  request->success = true;
 
   return true;
 }
@@ -618,23 +486,23 @@ bool handle_event_response(aergo *instance, struct request *request) {
 
   /* Set the callback functions */
 
-  struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
+  struct blob s1 = { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
   response.contractAddress.arg = &s1;
   response.contractAddress.funcs.decode = &read_blob;
 
-  struct blob s2 { .ptr = (uint8_t*) event.eventName, .size = sizeof event.eventName };
+  struct blob s2 = { .ptr = (uint8_t*) event.eventName, .size = sizeof event.eventName };
   response.eventName.arg = &s2;
   response.eventName.funcs.decode = &read_string;
 
-  struct blob s3 { .ptr = (uint8_t*) event.jsonArgs, .size = sizeof event.jsonArgs };
+  struct blob s3 = { .ptr = (uint8_t*) event.jsonArgs, .size = sizeof event.jsonArgs };
   response.jsonArgs.arg = &s3;
   response.jsonArgs.funcs.decode = &read_string;
 
-  struct blob b1 { .ptr = (uint8_t*) event.txHash, .size = sizeof event.txHash };
+  struct blob b1 = { .ptr = (uint8_t*) event.txHash, .size = sizeof event.txHash };
   response.txHash.arg = &b1;
   response.txHash.funcs.decode = &read_blob;
 
-  struct blob b2 { .ptr = (uint8_t*) event.blockHash, .size = sizeof event.blockHash };
+  struct blob b2 = { .ptr = (uint8_t*) event.blockHash, .size = sizeof event.blockHash };
   response.blockHash.arg = &b2;
   response.blockHash.funcs.decode = &read_blob;
 
@@ -663,7 +531,7 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   char *data = request->response;
   int len = request->received;
   Receipt response = Receipt_init_zero;
-  transaction_receipt *receipt = (transaction_receipt *) request->return;
+  transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
   char raw_address[64];
 
   memset(receipt, 0, sizeof(struct transaction_receipt));
@@ -675,23 +543,23 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
 
   /* Set the callback functions */
 
-  struct blob s1 { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
+  struct blob s1 = { .ptr = (uint8_t*) raw_address, .size = sizeof raw_address };
   response.contractAddress.arg = &s1;
   response.contractAddress.funcs.decode = &read_blob;
 
-  struct blob s2 { .ptr = (uint8_t*) receipt->status, .size = sizeof receipt->status };
+  struct blob s2 = { .ptr = (uint8_t*) receipt->status, .size = sizeof receipt->status };
   response.status.arg = &s2;
   response.status.funcs.decode = &read_string;
 
-  struct blob s3 { .ptr = (uint8_t*) receipt->ret, .size = sizeof receipt->ret };
+  struct blob s3 = { .ptr = (uint8_t*) receipt->ret, .size = sizeof receipt->ret };
   response.ret.arg = &s3;
   response.ret.funcs.decode = &read_string;
 
-  struct blob b1 { .ptr = (uint8_t*) receipt->txHash, .size = sizeof receipt->txHash };
+  struct blob b1 = { .ptr = (uint8_t*) receipt->txHash, .size = sizeof receipt->txHash };
   response.txHash.arg = &b1;
   response.txHash.funcs.decode = &read_blob;
 
-  struct blob b2 { .ptr = (uint8_t*) receipt->blockHash, .size = sizeof receipt->blockHash };
+  struct blob b2 = { .ptr = (uint8_t*) receipt->blockHash, .size = sizeof receipt->blockHash };
   response.blockHash.arg = &b2;
   response.blockHash.funcs.decode = &read_blob;
 
@@ -713,7 +581,7 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   receipt->txIndex = response.txIndex;
   receipt->feeDelegation = response.feeDelegation;
 
-  request->status = true;
+  request->success = true;
 
   return true;
 }
@@ -733,7 +601,7 @@ struct txn {
   uint64_t gasPrice;            // variable-length big-endian integer
   uint32_t type;
   unsigned char *chainIdHash;   // hash value of chain identifier in the block
-  unsigned char sign[MBEDTLS_ECDSA_MAX_LEN]; // sender's signature for this TxBody
+  unsigned char sign[80];       // sender's signature for this TxBody
   size_t sig_len;
   unsigned char hash[32];       // hash of the whole transaction including the signature
 };
@@ -798,7 +666,7 @@ bool sign_transaction(struct txn *txn, mbedtls_ecdsa_context *account){
 
   calculate_tx_hash(txn, hash, false);
 
-  DEBUG_PRINTLN("sign_transaction");
+  DEBUG_PRINTF("sign_transaction\n");
   DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
 
   // Sign the message hash
@@ -825,7 +693,7 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   calculate_tx_hash(txn, txn->hash, true);
 
   /* Set the values and the encoder callback functions */
-  struct blob bb { .ptr = txn->hash, .size = 32 };
+  struct blob bb = { .ptr = txn->hash, .size = 32 };
   message.hash.arg = &bb;
   message.hash.funcs.encode = &encode_blob;
 
@@ -834,18 +702,18 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   message.body.type = (TxType) txn->type;
   message.body.nonce = txn->nonce;
 
-  struct blob acc { .ptr = txn->account, .size = AddressLength };
+  struct blob acc = { .ptr = txn->account, .size = AddressLength };
   message.body.account.arg = &acc;
   message.body.account.funcs.encode = encode_blob;
 
-  struct blob rec { .ptr = txn->recipient, .size = AddressLength };
+  struct blob rec = { .ptr = txn->recipient, .size = AddressLength };
   message.body.recipient.arg = &rec;
   message.body.recipient.funcs.encode = encode_blob;
 
   message.body.payload.arg = txn->payload;
   message.body.payload.funcs.encode = &encode_string;
 
-  struct blob amt { .ptr = txn->amount, .size = txn->amount_len };
+  struct blob amt = { .ptr = txn->amount, .size = txn->amount_len };
   message.body.amount.arg = &amt;
   message.body.amount.funcs.encode = &encode_blob;
 
@@ -854,11 +722,11 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   message.body.gasPrice.arg = &txn->gasPrice;
   message.body.gasPrice.funcs.encode = &encode_varuint64;
 
-  struct blob cid { .ptr = txn->chainIdHash, .size = 32 };
+  struct blob cid = { .ptr = txn->chainIdHash, .size = 32 };
   message.body.chainIdHash.arg = &cid;
   message.body.chainIdHash.funcs.encode = &encode_blob;
 
-  struct blob sig { .ptr = txn->sign, .size = txn->sig_len };
+  struct blob sig = { .ptr = txn->sign, .size = txn->sig_len };
   message.body.sign.arg = &sig;
   message.body.sign.funcs.encode = &encode_blob;
 
@@ -1069,7 +937,7 @@ bool EncodeTxnHash(uint8_t *buffer, size_t *psize, char *txn_hash){
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
   /* Set the callback functions */
-  struct blob bb { .ptr = txn_hash, .size = 32 };
+  struct blob bb = { .ptr = txn_hash, .size = 32 };
   message.value.arg = &bb;
   message.value.funcs.encode = &encode_blob;
 
@@ -1159,7 +1027,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   struct request *request = NULL;
   bool status = false;
 
-  if (!instance || !account || !to_account || !amount || len <= 0) return false;
+  if (!instance || !from_account || !to_account || !amount || len <= 0) return false;
 
   if (check_blockchain_id_hash(instance) == false) return false;
 
@@ -1181,7 +1049,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   memcpy(request->txn_hash, txn_hash, 32);
   request->callback = cb;
   request->arg = arg;
-  request->return = receipt;
+  request->return_ptr = receipt;
 
   if (send_grpc_request(instance, "CommitTX", request, handle_transfer_response) == false) {
     goto loc_failed;
@@ -1190,7 +1058,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   if (request->callback) {
     return true;
   } else {
-    int status = request->status;
+    int status = request->success;
     free_request(instance, request);
     return status;
   }
@@ -1304,7 +1172,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   memcpy(request->txn_hash, txn_hash, 32);
   request->callback = cb;
   request->arg = arg;
-  request->return = receipt;
+  request->return_ptr = receipt;
 
   if (send_grpc_request(instance, "CommitTX", request, handle_contract_call_response) == false) {
     goto loc_failed;
@@ -1313,7 +1181,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   if (request->callback) {
     status = true;
   } else {
-    status = request->status;
+    status = request->success;
     free_request(instance, request);
   }
 loc_exit:
@@ -1394,8 +1262,8 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   request->size = size;
   request->callback = cb;
   request->arg = arg;
-  request->return = result;
-  request->return_len = resultlen;
+  request->return_ptr = result;
+  request->return_size = resultlen;
 
   if (send_grpc_request(instance, "QueryContract", request, handle_query_response) == false) {
     goto loc_failed;
@@ -1404,7 +1272,7 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   if (request->callback) {
     status = true;
   } else {
-    status = request->status;
+    status = request->success;
     free_request(instance, request);
   }
 loc_exit:
@@ -1514,7 +1382,7 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   memcpy(request->txn_hash, txn_hash, 32);
   request->callback = cb;
   request->arg = arg;
-  request->return = receipt;
+  request->return_ptr = receipt;
 
   if (send_grpc_request(instance, "GetReceipt", request, handle_receipt_response) == false) {
     goto loc_failed;
@@ -1523,7 +1391,7 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   if (request->callback) {
     return true;
   } else {
-    int status = request->status;
+    int status = request->success;
     free_request(instance, request);
     return status;
   }
@@ -1544,15 +1412,31 @@ bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receip
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void aergo_get_block(aergo *instance, uint64_t blockNo){
+bool aergo_get_block(aergo *instance, uint64_t blockNo){
   uint8_t buffer[128];
   size_t size;
+  struct request *request = NULL;
+
+  if (!instance || blockNo==0) return false;
 
   size = sizeof(buffer);
-  if (EncodeBlockNo(buffer, &size, blockNo)){
-    send_grpc_request(instance, "GetBlockMetadata", buffer, size, handle_block_response);
+  if (EncodeBlockNo(buffer, &size, blockNo) == false) return false;
+
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+  request->callback = cb;
+
+  if (send_grpc_request(instance, "GetBlockMetadata", request, handle_block_response) == false) {
+    goto loc_failed;
   }
 
+  return true;
+loc_failed:
+  free_request(instance, request);
+  return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1586,15 +1470,28 @@ loc_failed:
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void aergo_get_blockchain_status(aergo *instance){
+bool aergo_get_blockchain_status(aergo *instance){
   uint8_t buffer[128];
   size_t size;
+  struct request *request = NULL;
+  bool success;
+
+  if (!instance) return false;
 
   size = sizeof(buffer);
-  if (EncodeEmptyMessage(buffer, &size)){
-    send_grpc_request(instance, "Blockchain", buffer, size, handle_blockchain_status_response);
-  }
+  if (EncodeEmptyMessage(buffer, &size) == false) return false;
 
+  request = new_request(instance);
+  if (!request) return false;
+
+  request->data = buffer;
+  request->size = size;
+
+  send_grpc_request(instance, "Blockchain", request, handle_blockchain_status_response);
+
+  success = request->success;
+  free_request(instance, request);
+  return success;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1621,8 +1518,7 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
 
   if (send_grpc_request(instance, "GetState", request, handle_account_state_response) == false) goto loc_failed;
 
-  // copy values to the account structure
-
+  /* copy values to the account structure */
   copy_ecdsa_address(&account->keypair, buffer, sizeof buffer);
   encode_address(buffer, AddressLength, account->address, sizeof account->address);
 

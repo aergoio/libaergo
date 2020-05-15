@@ -28,6 +28,30 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account);
 void aergo_free_account(aergo_account *account);
 
 
+// Transaction Receipt
+
+typedef struct transaction_receipt transaction_receipt;
+
+struct transaction_receipt {
+  char contractAddress[56];  // in expanded/string form
+  char status[256];
+  char ret[256];  // value returned from the sc function?
+  uint64_t blockNo;
+  char blockHash[32];
+  int32_t txIndex;
+  char txHash[32];
+  uint64_t gasUsed;
+  double feeUsed;
+  bool feeDelegation;
+};
+
+typedef void (*transaction_receipt_cb)(void *arg, transaction_receipt *receipt);
+
+bool aergo_get_receipt(aergo *instance, char *txn_hash, struct transaction_receipt *receipt);
+
+bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receipt_cb cb, void *arg);
+
+
 // Transfer - synchronous
 
 // amount as double
@@ -88,6 +112,8 @@ bool aergo_query_smart_contract_async(aergo *instance, query_smart_contract_cb c
 
 // Smart contract events
 
+typedef struct contract_event contract_event;
+
 struct contract_event {
   char contractAddress[64];
   char eventName[64];
@@ -104,35 +130,13 @@ typedef void (*contract_event_cb)(void *arg, contract_event *event);
 bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, char *event_name, contract_event_cb cb, void *arg);
 
 
-// Transaction Receipt
-
-struct transaction_receipt {
-  char contractAddress[56];  // in expanded/string form
-  char status[256];
-  char ret[256];  // value returned from the sc function?
-  uint64_t blockNo;
-  char blockHash[32];
-  int32_t txIndex;
-  char txHash[32];
-  uint64_t gasUsed;
-  double feeUsed;
-  bool feeDelegation;
-};
-
-bool aergo_get_receipt(aergo *instance, char *txn_hash, struct transaction_receipt *receipt);
-
-typedef void (*transaction_receipt_cb)(void *arg, transaction_receipt *receipt);
-
-bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receipt_cb cb, void *arg);
-
-
 // Blocks
 
-void aergo_get_block(aergo *instance, uint64_t block_number);
+bool aergo_get_block(aergo *instance, uint64_t block_number);
 
-void aergo_block_stream_subscribe(aergo *instance);
+bool aergo_block_stream_subscribe(aergo *instance);
 
 
 // Status
 
-void aergo_get_blockchain_status(aergo *instance);
+bool aergo_get_blockchain_status(aergo *instance);

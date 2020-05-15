@@ -1,4 +1,4 @@
-#include "aergo-int.h"
+#include "linked_list.c"
 
 void close_socket(SOCKET sock) {
   shutdown(sock, 2);
@@ -70,17 +70,23 @@ int http_send_request(SOCKET sock, char *request, int request_size) {
 ** = 0 - there is more data to be read
 ** > 0 - all data was read
 */
-int http_get_response(SOCKET sock, char *response, int response_size, int *preceived) {
-  int bytes, received, total;
+int http_get_response(request *request) {
+  int bytes, total;
 
-  /* receive the response */
+  if (!request->response) {
+    request->response = malloc(2048);
+    if (!request->response) return -1;
+    request->response_size = 2048;
+    memset(request->response, 0, request->response_size);
+  }
 
-  memset(response, 0, response_size);
-  total = response_size - 1;
-  received = *preceived;
+loc_again:
+
+  total = request->response_size - 1;
+  if (total == 0) goto loc_realloc;
 
   do {
-    bytes = read(sock, response+received, total-received);
+    bytes = read(request->sock, request->response + request->received, total - request->received);
 printf("received %d bytes\n", bytes);
     if (bytes < 0) {
       int err = errno;
@@ -92,15 +98,23 @@ printf("received %d bytes\n", bytes);
     }
     if (bytes == 0)
       break;
-    received += bytes;
-  } while (received < total);
+    request->received += bytes;
+  } while (request->received < total);
 
-  if (received == total)
-    return -2;
+  if (request->received == total) {
+    int new_size;
+    void *ptr;
+  loc_realloc:
+    new_size = (total + 1) * 2;
+    ptr = realloc(request->response, new_size);
+    if (!ptr) { free(request->response); return -1; }
+    request->response = ptr;
+    request->response_size = new_size;
+    memset(request->response + request->received, 0, new_size - request->received);
+    goto loc_again;
+  }
 
-  *preceived = received;
-  return received;
-
+  return request->received;
 }
 
 static int aergo_process_requests__int(aergo *instance, int timeout) {
@@ -117,9 +131,9 @@ static int aergo_process_requests__int(aergo *instance, int timeout) {
   FD_ZERO(&readset);
   max = 0;
   for (request=instance->requests; request; request=request->next) {
-    if (request.sock != INVALID_SOCKET) {
-      FD_SET(request.sock, &readset);
-      if (request.sock > max) max = request.sock;
+    if (request->sock != INVALID_SOCKET) {
+      FD_SET(request->sock, &readset);
+      if (request->sock > max) max = request->sock;
     }
   }
   if (max == 0) goto loc_exit;
@@ -162,7 +176,7 @@ loc_exit:
   for (request=instance->requests; request; request=request->next) {
     if (request->sock == INVALID_SOCKET) {
       //instance->requests->next = request->next;
-      llist_del(&instance->requests, request);
+      llist_remove(&instance->requests, request);
       free(request);
       goto loc_exit; /* start again from the beginning */
     }
@@ -207,15 +221,9 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
     "X-Grpc-Web: 1\r\n"
     "Content-Length: %d\r\n"
     "\r\n";
-
-uint8_t *data, size_t data_size
-
   char http_request[4096];
-  int header_size;
+  int header_size, ret;
   char *p;
-
-//  char response[4096];
-
 
   /* connect to the host */
   request->sock = http_connect(instance->host, instance->port);
@@ -223,13 +231,13 @@ uint8_t *data, size_t data_size
 
   /* prepare the HTTP request */
   snprintf(http_request, sizeof(http_request), raw_request, service,
-    instance->host, instance->port, request->data_size);
+    instance->host, instance->port, request->size);
   header_size = strlen(http_request);
   p = http_request + header_size;
-  memcpy(p, request->data, request->data_size);
+  memcpy(p, request->data, request->size);
 
   /* send the request */
-  ret = http_send_request(request->sock, http_request, header_size + request->data_size);
+  ret = http_send_request(request->sock, http_request, header_size + request->size);
   if (ret <= 0) return false;
 
 
@@ -241,5 +249,6 @@ uint8_t *data, size_t data_size
     aergo_process_requests__int(instance, instance->timeout);
   }
 
-  DEBUG_PRINTLN("Request done. returning");
+  //DEBUG_PRINTF("Request done. returning\n");
+  return true;
 }

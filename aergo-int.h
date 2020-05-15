@@ -28,15 +28,24 @@ typedef struct sockaddr SOCKADDR;
 
 typedef struct request request;
 
+typedef bool (*process_response_cb)(aergo *instance, request *request);
+
 struct request {
   struct request *next;
+  void *data;
+  int size;
+  struct aergo_account *account;
   char txn_hash[32];
-  process_response_cb process_response;
   void *callback;
   void *arg;
+  void *return_ptr;
+  int return_size;
+  process_response_cb process_response;
   SOCKET sock;
   char *response; // dynamically allocated ?
+  int response_size;
   int received;
+  bool success;
 };
 
 
@@ -45,6 +54,7 @@ struct aergo {
   char host[32];
   int port;
   uint8_t blockchain_id_hash[32];
+  int timeout;
   request *requests;
 };
 
