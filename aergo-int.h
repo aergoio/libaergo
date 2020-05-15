@@ -26,6 +26,10 @@ typedef struct sockaddr SOCKADDR;
 #endif
 
 
+#include "secp256k1-vrf.h"
+
+
+
 typedef struct request request;
 
 typedef bool (*process_response_cb)(aergo *instance, request *request);
@@ -53,6 +57,7 @@ struct request {
 struct aergo {
   char host[32];
   int port;
+  secp256k1_context *ecdsa;
   uint8_t blockchain_id_hash[32];
   int timeout;
   request *requests;

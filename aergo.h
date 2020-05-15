@@ -12,7 +12,8 @@ void aergo_free(aergo *instance);
 typedef struct aergo_account aergo_account;
 
 struct aergo_account {
-  //mbedtls_ecdsa_context keypair;
+  unsigned char privkey[32];
+  char pubkey[33];
   char address[64];
   uint64_t nonce;
   double balance;

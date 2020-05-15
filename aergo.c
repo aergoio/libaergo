@@ -229,40 +229,6 @@ bool encode_account_address(pb_ostream_t *stream, const pb_field_t *field, void 
     return pb_encode_string(stream, (uint8_t*)decoded, AddressLength);
 }
 
-bool copy_ecdsa_address(mbedtls_ecdsa_context *account, uint8_t *buf, size_t bufsize) {
-    size_t len;
-    bool ret;
-
-    ret = mbedtls_ecp_point_write_binary(&account->grp, &account->Q,
-                MBEDTLS_ECP_PF_COMPRESSED, &len, buf, bufsize);
-
-    DEBUG_PRINTF("copy_ecdsa_address - ret=%d len=%d\n", ret, len);
-
-    return ret && (len == AddressLength);
-}
-
-bool encode_ecdsa_address(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
-    mbedtls_ecdsa_context *account = *(mbedtls_ecdsa_context**)arg;
-    uint8_t buf[128];
-    size_t len;
-    bool ret;
-
-    ret = mbedtls_ecp_point_write_binary(&account->grp, &account->Q,
-                MBEDTLS_ECP_PF_COMPRESSED, &len, buf, sizeof buf);
-
-    if( ret != 0 ){
-        DEBUG_PRINTF("encode_ecdsa_address - invalid account\n");
-        return false;
-    }
-
-    DEBUG_PRINTF("encode_ecdsa_address - len=%d\n", len);
-
-    if (!pb_encode_tag_for_field(stream, field))
-        return false;
-
-    return pb_encode_string(stream, buf, len);
-}
-
 bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
     char *str = *(char**)arg;
 
@@ -660,27 +626,32 @@ bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signat
   return true;
 }
 
-bool sign_transaction(struct txn *txn, mbedtls_ecdsa_context *account){
+bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
+  secp256k1_ecdsa_signature sig;
   uint8_t hash[32];
   bool ret;
 
+  DEBUG_PRINTF("sign_transaction\n");
+
   calculate_tx_hash(txn, hash, false);
 
-  DEBUG_PRINTF("sign_transaction\n");
   DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
 
-  // Sign the message hash
-  ret = mbedtls_ecdsa_write_signature(account, MBEDTLS_MD_SHA256,
-                                      hash, sizeof(hash),
-                                      txn->sign, &txn->sig_len,
-                                      ecdsa_rand, NULL);
-  if (ret == 0) {
-    DEBUG_PRINT_BUFFER("  signature", txn->sign, txn->sig_len);
-  } else {
-    DEBUG_PRINTF("write_signature FAILED: %d\n", ret);
-  }
+  /* sign the message hash */
 
-  return (ret == 0);
+  ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
+  if (ret == false) goto loc_failed;
+
+  ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
+  if (ret == false) goto loc_failed;
+
+  txn->sig_len = 64;  /* size of the compact signature format */
+
+  DEBUG_PRINT_BUFFER("signature", txn->sign, txn->sig_len);
+  return true;
+loc_failed:
+  DEBUG_PRINTF("write_signature FAILED: %d\n", ret);
+  return false;
 }
 
 bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
@@ -773,7 +744,7 @@ bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct t
 // COMMAND ENCODING
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo_account *account, char *recipient, uint8_t *amount, int amount_len) {
+bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * instance, aergo_account *account, char *recipient, uint8_t *amount, int amount_len) {
   struct txn txn;
   char out[64]={0};
 
@@ -783,7 +754,7 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo_accoun
   account->nonce++;
 
   txn.nonce = account->nonce;
-  copy_ecdsa_address(&account->keypair, txn.account, sizeof txn.account);
+  memcpy(txn.account, account->pubkey, sizeof txn.account);
   decode_address(recipient, strlen(recipient), txn.recipient, sizeof(txn.recipient));
   txn.amount = amount;   // variable-length big-endian integer
   txn.amount_len = amount_len;
@@ -797,14 +768,14 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo_accoun
   DEBUG_PRINTF("account address: %s\n", out);
   DEBUG_PRINTF("account nonce: %llu\n", account->nonce);
 
-  if (sign_transaction(&txn, &account->keypair) == false) {
+  if (sign_transaction(instance, account, &txn) == false) {
     return false;
   }
 
   return encode_transaction(buffer, psize, txn_hash, &txn);
 }
 
-bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *contract_address, char *call_info, aergo_account *account) {
+bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *contract_address, char *call_info, aergo *instance, aergo_account *account) {
   struct txn txn;
   char out[64]={0};
 
@@ -812,7 +783,7 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *co
   account->nonce++;
 
   txn.nonce = account->nonce;
-  copy_ecdsa_address(&account->keypair, txn.account, sizeof txn.account);
+  memcpy(txn.account, account->pubkey, sizeof txn.account);
   decode_address(contract_address, strlen(contract_address), txn.recipient, sizeof(txn.recipient));
   txn.amount = null_byte;   // variable-length big-endian integer
   txn.amount_len = 1;
@@ -826,7 +797,7 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *co
   DEBUG_PRINTF("account address: %s\n", out);
   DEBUG_PRINTF("account nonce: %llu\n", account->nonce);
 
-  if (sign_transaction(&txn, &account->keypair) == false) {
+  if (sign_transaction(instance, account, &txn) == false) {
     return false;
   }
 
@@ -903,7 +874,7 @@ bool EncodeFilterInfo(uint8_t *buffer, size_t *psize, char *contract_address, ch
   return true;
 }
 
-bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, mbedtls_ecdsa_context *account) {
+bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, aergo_account *account) {
   SingleBytes message = SingleBytes_init_zero;
   uint32_t size;
 
@@ -911,8 +882,9 @@ bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, mbedtls_ecdsa_context 
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
   /* Set the callback functions */
-  message.value.funcs.encode = &encode_ecdsa_address;
-  message.value.arg = account;
+  struct blob bb = { .ptr = account->pubkey, .size = 33 };
+  message.value.arg = &bb;
+  message.value.funcs.encode = &encode_blob;
 
   /* Decode the message */
   bool status = pb_encode(&stream, SingleBytes_fields, &message);
@@ -1067,7 +1039,8 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   }
 
   size = sizeof(buffer);
-  if (EncodeTransfer(buffer, &size, txn_hash, from_account, to_account, amount, len) == false) {
+  if (EncodeTransfer(buffer, &size, txn_hash, instance,
+                     from_account, to_account, amount, len) == false) {
     goto loc_failed;
   }
 
@@ -1190,7 +1163,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   }
 
   size += 256;
-  if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, account)) {
+  if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, instance, account)) {
     goto loc_failed;
   }
 
@@ -1442,7 +1415,9 @@ bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receip
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool aergo_get_block(aergo *instance, uint64_t blockNo){
+/*
+
+static bool aergo_get_block__int(aergo *instance, uint64_t blockNo){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
@@ -1468,6 +1443,18 @@ loc_failed:
   free_request(instance, request);
   return false;
 }
+
+bool aergo_get_block(aergo *instance, uint64_t blockNo){
+
+
+}
+
+bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
+
+
+}
+
+*/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1529,15 +1516,14 @@ bool aergo_get_blockchain_status(aergo *instance){
 bool aergo_get_account_state(aergo *instance, aergo_account *account){
   uint8_t buffer[128];
   size_t size;
+  struct request *request = NULL;
 
   if (!instance || !account) return false;
 
   account->is_updated = false;
 
   size = sizeof(buffer);
-  if (EncodeAccountAddress(buffer, &size, &account->keypair)) {
-    return false;
-  }
+  if (EncodeAccountAddress(buffer, &size, account) == false) return false;
 
   request = new_request(instance);
   if (!request) return false;
@@ -1548,9 +1534,8 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
 
   if (send_grpc_request(instance, "GetState", request, handle_account_state_response) == false) goto loc_failed;
 
-  /* copy values to the account structure */
-  copy_ecdsa_address(&account->keypair, buffer, sizeof buffer);
-  encode_address(buffer, AddressLength, account->address, sizeof account->address);
+  /* get the account address */
+  encode_address(account->pubkey, AddressLength, account->address, sizeof account->address);
 
   free_request(instance, request);
   return account->is_updated;
@@ -1573,17 +1558,19 @@ aergo * aergo_connect(char *host, int port) {
   strcpy(instance->host, host);
   instance->port = port;
   instance->timeout = 5000; /* default timeout */
+  instance->ecdsa = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
 
   return instance;
 }
 
 void aergo_free(aergo *instance) {
   if (instance) {
+    if (instance->ecdsa) secp256k1_context_destroy(instance->ecdsa);
     while (instance->requests) free_request(instance, instance->requests);
     free(instance);
   }
 }
 
 void aergo_free_account(aergo_account *account) {
-  mbedtls_ecdsa_free(&account->keypair);
+  //xxx_free(account->yyy);
 }
