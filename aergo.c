@@ -3,6 +3,36 @@
 
 #include "stdarg.h"
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if defined(DEBUG_MESSAGES)
+#define DEBUG_PRINTF       printf
+#define DEBUG_PRINTLN      puts
+#define DEBUG_PRINT_BUFFER print_buffer
+
+static void print_buffer(const char *title, unsigned char *data, size_t len){
+  size_t i;
+  DEBUG_PRINTF("%s (%d bytes) ", title, len);
+  for(i=0; i<len; i++){
+    DEBUG_PRINTF(" %02x", data[i]);
+    if(i % 16 == 15) DEBUG_PRINTF("\n");
+  }
+  DEBUG_PRINTF("\n");
+}
+
+#else
+#define DEBUG_PRINTF(...)
+#define DEBUG_PRINTLN(...)
+#define DEBUG_PRINT_BUFFER(...)
+#endif
+
+size_t strlen2(char *str){
+  if (!str) return 0;
+  return strlen(str);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include "nanopb/pb_common.c"
 #include "nanopb/pb_encode.c"
 #include "nanopb/pb_decode.c"
@@ -17,33 +47,6 @@
 
 #include "account.c"
 #include "socket.c"
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-//#define DEBUG_MESSAGES 1
-
-#if defined(DEBUG_MESSAGES)
-#define DEBUG_PRINTF     printf
-#define DEBUG_PRINT_BUFFER print_buffer
-#else
-#define DEBUG_PRINTF(...)
-#define DEBUG_PRINT_BUFFER(...)
-#endif
-
-static void print_buffer(const char *title, unsigned char *data, size_t len){
-  size_t i;
-  DEBUG_PRINTF("%s (%d bytes) ", title, len);
-  for(i=0; i<len; i++){
-    DEBUG_PRINTF(" %02x", data[i]);
-    if(i % 16 == 15) DEBUG_PRINTF("\n");
-  }
-  DEBUG_PRINTF("\n");
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// PRIVATE KEY STORAGE
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // DECODING
@@ -289,7 +292,6 @@ bool handle_blockchain_status_response(aergo *instance, struct request *request)
   /* Print the data contained in the message */
   DEBUG_PRINT_BUFFER("ChainIdHash: ", blockchain_id_hash, sizeof(blockchain_id_hash));
 
-  request->success = true;
   return true;
 }
 
@@ -382,9 +384,7 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  request->success = (response.results.error == CommitStatus_TX_OK);
-
-  return true;
+  return (response.results.error == CommitStatus_TX_OK);
 }
 
 bool handle_contract_call_response(aergo *instance, struct request *request) {
@@ -410,9 +410,7 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  request->success = (response.results.error == CommitStatus_TX_OK);
-
-  return true;
+  return (response.results.error == CommitStatus_TX_OK);
 }
 
 bool handle_query_response(aergo *instance, struct request *request) {
@@ -435,8 +433,6 @@ bool handle_query_response(aergo *instance, struct request *request) {
     DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
     return false;
   }
-
-  request->success = true;
 
   return true;
 }
@@ -549,8 +545,6 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   receipt->blockNo = response.blockNo;
   receipt->txIndex = response.txIndex;
   receipt->feeDelegation = response.feeDelegation;
-
-  request->success = true;
 
   return true;
 }
@@ -1044,7 +1038,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   size = sizeof(buffer);
   if (EncodeTransfer(buffer, &size, txn_hash, instance,
                      from_account, to_account, amount, len) == false) {
-    goto loc_failed;
+    return false;
   }
 
   request = new_request(instance);
@@ -1057,20 +1051,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   request->arg = arg;
   request->return_ptr = receipt;
 
-  if (send_grpc_request(instance, "CommitTX", request, handle_transfer_response) == false) {
-    goto loc_failed;
-  }
-
-  if (request->callback) {
-    return true;
-  } else {
-    int status = request->success;
-    free_request(instance, request);
-    return status;
-  }
-loc_failed:
-  free_request(instance, request);
-  return false;
+  return send_grpc_request(instance, "CommitTX", request, handle_transfer_response);
 }
 
 bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *amount, int len){
@@ -1087,7 +1068,7 @@ bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_acc
   char buf[16];
   int len;
 
-  len = string_to_bignum(value, strlen(value), buf, sizeof(buf));
+  len = string_to_bignum(value, strlen2(value), buf, sizeof(buf));
 
   return aergo_transfer_bignum(instance, receipt, from_account, to_account, buf, len);
 }
@@ -1096,7 +1077,7 @@ bool aergo_transfer_str_async(aergo *instance, transaction_receipt_cb cb, void *
   char buf[16];
   int len;
 
-  len = string_to_bignum(value, strlen(value), buf, sizeof(buf));
+  len = string_to_bignum(value, strlen2(value), buf, sizeof(buf));
 
   return aergo_transfer_bignum_async(instance, cb, arg, from_account, to_account, buf, len);
 }
@@ -1152,10 +1133,10 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
     if (aergo_get_account_state(instance, account) == false) return false;
   }
 
-  size = strlen(function) + strlen(args);
+  size = strlen(function) + strlen2(args);
   call_info = malloc(size + 32);
   buffer = malloc(size + 256);
-  if (!call_info || !buffer) goto loc_failed;
+  if (!call_info || !buffer) goto loc_exit;
 
   if (args) {
     snprintf(call_info, size + 32,
@@ -1167,11 +1148,11 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   size += 256;
   if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, instance, account)) {
-    goto loc_failed;
+    goto loc_exit;
   }
 
   request = new_request(instance);
-  if (!request) goto loc_failed;
+  if (!request) goto loc_exit;
 
   request->data = buffer;
   request->size = size;
@@ -1180,23 +1161,12 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   request->arg = arg;
   request->return_ptr = receipt;
 
-  if (send_grpc_request(instance, "CommitTX", request, handle_contract_call_response) == false) {
-    goto loc_failed;
-  }
+  status = send_grpc_request(instance, "CommitTX", request, handle_contract_call_response);
 
-  if (request->callback) {
-    status = true;
-  } else {
-    status = request->success;
-    free_request(instance, request);
-  }
 loc_exit:
   if (call_info) free(call_info);
   if (buffer   ) free(buffer   );
   return status;
-loc_failed:
-  free_request(instance, request);
-  goto loc_exit;
 }
 
 bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receipt, aergo_account *account, char *contract_address, char *function, char *args){
@@ -1245,10 +1215,10 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
 
   if (!instance || !contract_address || !function) return false;
 
-  size = strlen(function) + strlen(args);
+  size = strlen(function) + strlen2(args);
   query_info = malloc(size + 32);
   buffer = malloc(size + 256);
-  if (!query_info || !buffer) goto loc_failed;
+  if (!query_info || !buffer) goto loc_exit;
 
   if (args) {
     snprintf(query_info, size + 32,
@@ -1259,10 +1229,10 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   }
 
   size += 256;
-  if (EncodeQuery(buffer, &size, contract_address, query_info)) goto loc_failed;
+  if (EncodeQuery(buffer, &size, contract_address, query_info) == false) goto loc_exit;
 
   request = new_request(instance);
-  if (!request) goto loc_failed;
+  if (!request) goto loc_exit;
 
   request->data = buffer;
   request->size = size;
@@ -1271,23 +1241,12 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   request->return_ptr = result;
   request->return_size = resultlen;
 
-  if (send_grpc_request(instance, "QueryContract", request, handle_query_response) == false) {
-    goto loc_failed;
-  }
+  status = send_grpc_request(instance, "QueryContract", request, handle_query_response);
 
-  if (request->callback) {
-    status = true;
-  } else {
-    status = request->success;
-    free_request(instance, request);
-  }
 loc_exit:
   if (query_info) free(query_info);
   if (buffer    ) free(buffer    );
   return status;
-loc_failed:
-  free_request(instance, request);
-  goto loc_exit;
 }
 
 bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, char *contract_address, char *function, char *args){
@@ -1357,15 +1316,9 @@ bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, ch
   request->size = size;
   request->callback = cb;
   request->arg = arg;
+  request->keep_active = true;
 
-  if (send_grpc_request(instance, "ListEventStream", request, handle_event_response) == false){
-    goto loc_failed;
-  }
-
-  return true;
-loc_failed:
-  free_request(instance, request);
-  return false;
+  return send_grpc_request(instance, "ListEventStream", request, handle_event_response);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1378,7 +1331,7 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   if (!instance || !txn_hash) return false;
 
   size = sizeof(buffer);
-  if (EncodeTxnHash(buffer, &size, txn_hash) == false) goto loc_failed;
+  if (EncodeTxnHash(buffer, &size, txn_hash) == false) return false;
 
   request = new_request(instance);
   if (!request) return false;
@@ -1390,20 +1343,7 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   request->arg = arg;
   request->return_ptr = receipt;
 
-  if (send_grpc_request(instance, "GetReceipt", request, handle_receipt_response) == false) {
-    goto loc_failed;
-  }
-
-  if (request->callback) {
-    return true;
-  } else {
-    int status = request->success;
-    free_request(instance, request);
-    return status;
-  }
-loc_failed:
-  free_request(instance, request);
-  return false;
+  return send_grpc_request(instance, "GetReceipt", request, handle_receipt_response);
 }
 
 bool aergo_get_receipt(aergo *instance, char *txn_hash, struct transaction_receipt *receipt){
@@ -1437,14 +1377,7 @@ static bool aergo_get_block__int(aergo *instance, uint64_t blockNo){
   request->size = size;
   request->callback = cb;
 
-  if (send_grpc_request(instance, "GetBlockMetadata", request, handle_block_response) == false) {
-    goto loc_failed;
-  }
-
-  return true;
-loc_failed:
-  free_request(instance, request);
-  return false;
+  return send_grpc_request(instance, "GetBlockMetadata", request, handle_block_response);
 }
 
 bool aergo_get_block(aergo *instance, uint64_t blockNo){
@@ -1478,15 +1411,9 @@ bool aergo_block_stream_subscribe(aergo *instance){
   request->data = buffer;
   request->size = size;
   request->callback = cb;
+  request->keep_active = true;
 
-  if (send_grpc_request(instance, "ListBlockStream", request, handle_block_response) == false) {
-    goto loc_failed;
-  }
-
-  return true;
-loc_failed:
-  free_request(instance, request);
-  return false;
+  return send_grpc_request(instance, "ListBlockStream", request, handle_block_response);
 }
 */
 
@@ -1496,7 +1423,6 @@ bool aergo_get_blockchain_status(aergo *instance){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
-  bool success;
 
   if (!instance) return false;
 
@@ -1509,11 +1435,7 @@ bool aergo_get_blockchain_status(aergo *instance){
   request->data = buffer;
   request->size = size;
 
-  send_grpc_request(instance, "Blockchain", request, handle_blockchain_status_response);
-
-  success = request->success;
-  free_request(instance, request);
-  return success;
+  return send_grpc_request(instance, "Blockchain", request, handle_blockchain_status_response);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1537,16 +1459,12 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
   request->size = size;
   request->account = account;
 
-  if (send_grpc_request(instance, "GetState", request, handle_account_state_response) == false) goto loc_failed;
+  send_grpc_request(instance, "GetState", request, handle_account_state_response);
 
   /* get the account address */
   encode_address(account->pubkey, AddressLength, account->address, sizeof account->address);
 
-  free_request(instance, request);
   return account->is_updated;
-loc_failed:
-  free_request(instance, request);
-  return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1574,8 +1492,4 @@ void aergo_free(aergo *instance) {
     while (instance->requests) free_request(instance, instance->requests);
     free(instance);
   }
-}
-
-void aergo_free_account(aergo_account *account) {
-  //xxx_free(account->yyy);
 }

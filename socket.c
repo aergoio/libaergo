@@ -1,6 +1,7 @@
 #include "linked_list.c"
 
 void close_socket(SOCKET sock) {
+  DEBUG_PRINTLN("close_socket");
   shutdown(sock, 2);
 #ifdef _WIN32
   closesocket(sock);
@@ -14,6 +15,8 @@ SOCKET http_connect(char *host, unsigned short int port){
   struct sockaddr_in serv_addr;
   SOCKET sock;
   int on = 1;
+
+  DEBUG_PRINTLN("http_connect");
 
   /* lookup the ip address */
   server = gethostbyname(host);
@@ -44,7 +47,7 @@ loc_failed:
 int http_send_request(SOCKET sock, char *request, int request_size) {
   int bytes, sent, total;
 
-  printf("Request:\n-----\n%s\n-----\n", request);
+  DEBUG_PRINTF("http_send_request\n-----\n%s\n-----\n", request);
 
   /* send the request */
 
@@ -73,6 +76,8 @@ int http_send_request(SOCKET sock, char *request, int request_size) {
 int http_get_response(request *request) {
   int bytes, total;
 
+  DEBUG_PRINTLN("http_get_response");
+
   if (!request->response) {
     request->response = malloc(2048);
     if (!request->response) return -1;
@@ -83,11 +88,11 @@ int http_get_response(request *request) {
 loc_again:
 
   total = request->response_size - 1;
-  if (total == 0) goto loc_realloc;
+  if (request->received == total) goto loc_realloc;
 
   do {
     bytes = read(request->sock, request->response + request->received, total - request->received);
-printf("received %d bytes\n", bytes);
+    DEBUG_PRINTF("received %d bytes\n", bytes);
     if (bytes < 0) {
       int err = errno;
       if (err == EAGAIN || err == EWOULDBLOCK) {
@@ -117,7 +122,41 @@ printf("received %d bytes\n", bytes);
   return request->received;
 }
 
-static int aergo_process_requests__int(aergo *instance, int timeout) {
+
+static bool http_strip_header(request *request){
+  char *ptr;
+  int header_size;
+
+  DEBUG_PRINTLN("http_strip_header");
+
+  if (!request->response || request->received <= 0) return false;
+
+  ptr = strstr(request->response, "\r\n\r\n");
+  if (!ptr) return false;
+
+#ifdef DEBUG_MESSAGES
+  *ptr = 0;
+  DEBUG_PRINTF("-----\n%s\n-----\n", request->response);
+#endif
+
+  ptr += 4;
+
+  /* this removes the additional data sent before the content */
+  ptr = strstr(ptr, "\r\n");
+  ptr += 2;
+
+  header_size = ptr - request->response;
+  memmove(request->response, ptr, request->received - header_size);
+  request->received -= header_size;
+
+  DEBUG_PRINTF("  header = %d bytes\n", header_size);
+  DEBUG_PRINTF("  data   = %d bytes\n", request->received);
+
+  return true;
+}
+
+
+static int aergo_process_requests__int(aergo *instance, int timeout, bool *psuccess) {
   fd_set readset;
   struct timeval tv;
   unsigned int max;
@@ -126,6 +165,8 @@ static int aergo_process_requests__int(aergo *instance, int timeout) {
 
   if (!instance) return -1;
   if (!instance->requests) return 0;
+
+  DEBUG_PRINTLN("aergo_process_requests");
 
   // get the list of active sockets and put them in the readfs
   FD_ZERO(&readset);
@@ -155,14 +196,18 @@ static int aergo_process_requests__int(aergo *instance, int timeout) {
       /* read data from socket */
       ret = http_get_response(request);
       if (ret > 0) {
-        /* parse the received data */
-        request->process_response(instance, request);
-        /* mark to release the request */
-        ret = -1;
+        /* remove the HTTP header */
+        if (http_strip_header(request)) {
+          /* parse the received data */
+          bool success = request->process_response(instance, request);
+          if (psuccess) *psuccess = success;
+        }
+        if (!request->keep_active) {
+          /* mark to release the request */
+          ret = -1;
+        }
       }
       if (ret < 0) {
-        /* release the allocated memory */
-        free(request->response);
         /* close the socket */
         close_socket(request->sock);
         request->sock = INVALID_SOCKET;
@@ -175,9 +220,7 @@ loc_exit:
   /* release processed requests */
   for (request=instance->requests; request; request=request->next) {
     if (request->sock == INVALID_SOCKET) {
-      //instance->requests->next = request->next;
-      llist_remove(&instance->requests, request);
-      free(request);
+      free_request(instance, request);
       goto loc_exit; /* start again from the beginning */
     }
   }
@@ -198,7 +241,7 @@ loc_failed:
 
 int aergo_process_requests(aergo *instance) {
   /* no timeout, just check and return immediately */
-  return aergo_process_requests__int(instance, 0);
+  return aergo_process_requests__int(instance, 0, NULL);
 }
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size){
@@ -224,6 +267,9 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
   char http_request[4096];
   int header_size, ret;
   char *p;
+  bool success = false;
+
+  DEBUG_PRINTLN("send_grpc_request");
 
   /* connect to the host */
   request->sock = http_connect(instance->host, instance->port);
@@ -244,11 +290,14 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
   /* save the response handler */
   request->process_response = response_callback;
 
-  /* if the call is synchronous, wait for the response */
-  if (!request->callback) {
-    aergo_process_requests__int(instance, instance->timeout);
+  if (request->callback) {
+    /* if the call is asynchronous, just return */
+    success = true;
+  } else {
+    /* if the call is synchronous, wait for the response */
+    aergo_process_requests__int(instance, instance->timeout, &success);
   }
 
-  //DEBUG_PRINTF("Request done. returning\n");
-  return true;
+  DEBUG_PRINTLN("send_grpc_request OK");
+  return success;
 }

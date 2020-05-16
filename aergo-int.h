@@ -1,10 +1,6 @@
-//#include "mbedtls/bignum.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <stdint.h>
-//#include <stdbool.h>
 
 #include <errno.h>
 
@@ -16,8 +12,8 @@
 #include <netinet/in.h>  /* struct sockaddr_in, struct sockaddr */
 #include <netinet/tcp.h> /* TCP_NODELAY */
 //#include <netinet/ip.h>
-#include <netdb.h>  /* struct hostent, gethostbyname */
-#include <unistd.h> /* read, write, close */
+#include <netdb.h>       /* struct hostent, gethostbyname */
+#include <unistd.h>      /* read, write, close */
 #define SOCKET int
 #define INVALID_SOCKET  (~0)
 #define SOCKET_ERROR    (-1)
@@ -49,7 +45,7 @@ struct request {
   char *response;
   int response_size;
   int received;
-  bool success;
+  bool keep_active;
 };
 
 

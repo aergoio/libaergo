@@ -1,6 +1,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
+// Connection
+
 typedef struct aergo aergo;
 
 aergo * aergo_connect(char *host, int port);
@@ -21,12 +24,7 @@ struct aergo_account {
   bool is_updated;
 };
 
-int aergo_load_account_secret(aergo_account *account, char *buf, int len);
-int aergo_export_account_secret(aergo_account *account, char *buf, int len);
-
 bool aergo_get_account_state(aergo *instance, aergo_account *account);
-
-void aergo_free_account(aergo_account *account);
 
 
 // Transaction Receipt
@@ -55,16 +53,12 @@ bool aergo_get_receipt_async(aergo *instance, char *txn_hash, transaction_receip
 
 // Transfer - synchronous
 
-// amount as double
 bool aergo_transfer(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, double value);
 
-// amount as integer and decimal (note: decimal with 18 digits!)
 bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, uint64_t integer, uint64_t decimal);
 
-// amount as string (null terminated) eg: "130.25" - unit: aergo)
 bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *value);
 
-// amount as big-endian variable size integer
 bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, char *to_account, char *amount, int len);
 
 // Transfer - asynchronous
@@ -85,15 +79,12 @@ bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receip
 
 bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, aergo_account *account, char *contract_address, char *function, char *types, ...);
 
-  // they should return int with error
-
 // Call smart contract function - asynchronous
 
 bool aergo_call_smart_contract_json_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, char *contract_address, char *function, char *args);
 
 bool aergo_call_smart_contract_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, char *contract_address, char *function, char *types, ...);
 
-  // or maybe set the account and callback before the fn call? (to decrease the # of args)
 
 
 // Query smart contract - synchronous
