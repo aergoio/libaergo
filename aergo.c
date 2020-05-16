@@ -3,16 +3,19 @@
 
 #include "stdarg.h"
 
-#include "nanopb/pb_common.h"
-#include "nanopb/pb_encode.h"
-#include "nanopb/pb_decode.h"
+#include "nanopb/pb_common.c"
+#include "nanopb/pb_encode.c"
+#include "nanopb/pb_decode.c"
 
-#include "blockchain.pb.h"
+#include "blockchain.pb.c"
 
-#include "endianess.h"
-#include "conversions.h"
-#include "account.h"
+#include "endianess.c"
+#include "sha256.c"
+#include "base58.c"
+#include "conversions.c"
+#include "mbedtls/bignum.c"
 
+#include "account.c"
 #include "socket.c"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1458,6 +1461,7 @@ bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 bool aergo_block_stream_subscribe(aergo *instance){
   uint8_t buffer[32];
   size_t size;
@@ -1484,6 +1488,7 @@ loc_failed:
   free_request(instance, request);
   return false;
 }
+*/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
