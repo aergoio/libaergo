@@ -82,7 +82,6 @@ bool read_string(pb_istream_t *stream, const pb_field_t *field, void **arg){
     struct blob *str = *(struct blob**)arg;
     size_t len = stream->bytes_left;
 
-    DEBUG_PRINTF("read_string arg=%p\n", str);
     if (!str) return true;
     DEBUG_PRINTF("read_string bytes_left=%d str->size=%d\n", stream->bytes_left, str->size);
 
@@ -97,7 +96,7 @@ bool read_string(pb_istream_t *stream, const pb_field_t *field, void **arg){
 
     str->ptr[len] = 0;  // null terminator
 
-    DEBUG_PRINTF("read_string ok\n");
+    DEBUG_PRINTF("read_string ok: %s\n", str->ptr);
     return true;
 }
 

@@ -126,6 +126,7 @@ loc_again:
 static bool http_strip_header(request *request){
   char *ptr;
   int header_size;
+  int data_size;
 
   DEBUG_PRINTLN("http_strip_header");
 
@@ -139,18 +140,23 @@ static bool http_strip_header(request *request){
   DEBUG_PRINTF("-----\n%s\n-----\n", request->response);
 #endif
 
+  header_size = ptr - request->response;
   ptr += 4;
 
-  /* this removes the additional data sent before the content */
+  /* removes the additional data sent before the content */
   ptr = strstr(ptr, "\r\n");
   ptr += 2;
 
-  header_size = ptr - request->response;
-  memmove(request->response, ptr, request->received - header_size);
-  request->received -= header_size;
+  /* gets the size of the first data stream */
+  copy_be32(&data_size, (int*)(ptr + 1));
+  data_size += 5;
+
+  /* move the data to the buffer beginning */
+  memmove(request->response, ptr, data_size);
+  request->received = data_size;
 
   DEBUG_PRINTF("  header = %d bytes\n", header_size);
-  DEBUG_PRINTF("  data   = %d bytes\n", request->received);
+  DEBUG_PRINTF("  data   = %d bytes\n", data_size);
 
   return true;
 }
