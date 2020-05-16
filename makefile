@@ -56,13 +56,18 @@ STRIP ?= strip
 AR    ?= ar
 
 
-all: $(LIBRARY) static
+all:    $(LIBRARY) static
+
+debug:  $(LIBRARY) static
+
+debug:  export CFLAGS :=  -g -DDEBUG_MESSAGES  $(CFLAGS)
 
 static: libaergo.a
 
 
-aergo.o:
-	$(CC) -c  aergo.c  -Inanopb -std=c99 -Wno-pointer-sign
+
+aergo.o: account.c account.h aergo-int.h aergo.c aergo.h base58.c base58.h blockchain.pb.c blockchain.pb.h conversions.c endianess.c linked_list.c sha256.c socket.c mbedtls/bignum.c nanopb/pb_common.c nanopb/pb_encode.c nanopb/pb_decode.c
+	$(CC) -c  aergo.c  $(CFLAGS) -Inanopb -std=c99 -Wno-pointer-sign
 
 
 libaergo.a: aergo.o
@@ -72,31 +77,47 @@ libaergo.a: aergo.o
 # Linux / Unix
 libaergo.so.0.1: aergo.o
 	$(CC) -shared -Wl,-soname,$(SONAME)  -o $@  $^  $(LDLIBS) $(LDFLAGS)
+ifeq ($(MAKECMDGOALS),valgrind)
+else ifeq ($(MAKECMDGOALS),debug)
+else
 	$(STRIP) $@
+endif
 	ln -sf $(LIBRARY) $(LIBNICK)
 
 # OSX
 libaergo.0.dylib: aergo.o
 	$(CC) -dynamiclib -install_name "$(INSTNAME)" -current_version $(CURR_VERSION) -compatibility_version $(COMPAT_VERSION)  -o $@  $^  $(LDLIBS) $(LDFLAGS)
+ifeq ($(MAKECMDGOALS),valgrind)
+else ifeq ($(MAKECMDGOALS),debug)
+else
 	$(STRIP) -x $@
+endif
 	ln -sf $(LIBRARY) $(LIBNICK)
 
 # iOS
 libaergo.dylib: aergo.o
 	$(CC) -dynamiclib  -o $@  $^  $(LDLIBS) $(LDFLAGS)
+ifeq ($(MAKECMDGOALS),valgrind)
+else ifeq ($(MAKECMDGOALS),debug)
+else
 	$(STRIP) -x $@
+endif
 
 # Windows
 aergo-0.1.dll: aergo.o
 	$(CC) -shared  -o $@  $^  -Wl,--out-implib,$(IMPLIB).lib $(LDLIBS) $(LDFLAGS) -lws2_32
+ifeq ($(MAKECMDGOALS),valgrind)
+else ifeq ($(MAKECMDGOALS),debug)
+else
 	$(STRIP) $@
+endif
 
 
 install:
 	mkdir -p $(LIBPATH)
 	cp $(LIBRARY) $(LIBPATH)
 	cd $(LIBPATH) && ln -sf $(LIBRARY) $(LIBNICK)
-	#cp aergo.h $(INCPATH)
+	cp aergo.h $(INCPATH)
 
 clean:
 	rm -f *.o *.a $(LIBNICK) $(LIBRARY)
