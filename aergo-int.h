@@ -8,10 +8,10 @@
 #include <winsock.h>
 #else
 #include <sys/socket.h>  /* socket, connect */
-//#include <sys/select.h>
+#include <sys/select.h>
 #include <netinet/in.h>  /* struct sockaddr_in, struct sockaddr */
 #include <netinet/tcp.h> /* TCP_NODELAY */
-//#include <netinet/ip.h>
+#include <netinet/ip.h>
 #include <netdb.h>       /* struct hostent, gethostbyname */
 #include <unistd.h>      /* read, write, close */
 #define SOCKET int

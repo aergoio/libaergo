@@ -38,7 +38,7 @@ else
 	else
 		LIBRARY  = libaergo.so.0.1
 		LIBNICK  = libaergo.so
-		SONAME   = $(LIBNICK2)
+		SONAME   = $(LIBNICK)
 	endif
 	IMPLIB   = aergo
 	prefix  ?= /usr/local
