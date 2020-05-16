@@ -1439,12 +1439,29 @@ bool aergo_get_blockchain_status(aergo *instance){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+bool aergo_check_privkey(aergo *instance, aergo_account *account){
+  if (!instance || !account) return false;
+  return secp256k1_ec_seckey_verify(instance->ecdsa, account->privkey);
+}
+
 bool aergo_get_account_state(aergo *instance, aergo_account *account){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
 
   if (!instance || !account) return false;
+
+  if (account->pubkey[0] == 0 && account->pubkey[1] == 0) {
+    /* calculate the public key */
+    secp256k1_pubkey pubkey;
+    int ret = secp256k1_ec_pubkey_create(instance->ecdsa, &pubkey, account->privkey);
+    if (ret) {
+      size_t pklen = 33;
+      ret = secp256k1_ec_pubkey_serialize(instance->ecdsa, account->pubkey,
+                                         &pklen, &pubkey, SECP256K1_EC_COMPRESSED);
+    }
+    if (ret != 1) return false;
+  }
 
   account->is_updated = false;
 

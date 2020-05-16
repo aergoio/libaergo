@@ -16,13 +16,15 @@ typedef struct aergo_account aergo_account;
 
 struct aergo_account {
   unsigned char privkey[32];
-  char pubkey[33];
+  unsigned char pubkey[33];
   char address[64];
   uint64_t nonce;
   double balance;
   uint8_t state_root[32];
   bool is_updated;
 };
+
+bool aergo_check_privkey(aergo *instance, aergo_account *account);
 
 bool aergo_get_account_state(aergo *instance, aergo_account *account);
 
