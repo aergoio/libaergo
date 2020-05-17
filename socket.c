@@ -162,7 +162,7 @@ static bool http_strip_header(request *request){
 }
 
 
-static int aergo_process_requests__int(aergo *instance, int timeout, bool *psuccess) {
+static int aergo_process_requests__int(aergo *instance, request *main_request, int timeout, bool *psuccess) {
   fd_set readset;
   struct timeval tv;
   unsigned int max;
@@ -172,13 +172,16 @@ static int aergo_process_requests__int(aergo *instance, int timeout, bool *psucc
   if (!instance) return -1;
   if (!instance->requests) return 0;
 
-  DEBUG_PRINTLN("aergo_process_requests");
+  DEBUG_PRINTF("aergo_process_requests timeout=%d\n", timeout);
+
+loc_again:
 
   // get the list of active sockets and put them in the readfs
   FD_ZERO(&readset);
   max = 0;
   for (request=instance->requests; request; request=request->next) {
-    if (request->sock != INVALID_SOCKET) {
+    if (request->sock != INVALID_SOCKET && !request->processed) {
+      DEBUG_PRINTLN("  add request to set");
       FD_SET(request->sock, &readset);
       if (request->sock > max) max = request->sock;
     }
@@ -202,11 +205,14 @@ static int aergo_process_requests__int(aergo *instance, int timeout, bool *psucc
       /* read data from socket */
       ret = http_get_response(request);
       if (ret > 0) {
+        request->processed = true;
         /* remove the HTTP header */
         if (http_strip_header(request)) {
           /* parse the received data */
           bool success = request->process_response(instance, request);
-          if (psuccess) *psuccess = success;
+          if (request == main_request && psuccess) {
+            *psuccess = success;
+          }
         }
         if (!request->keep_active) {
           /* mark to release the request */
@@ -214,12 +220,15 @@ static int aergo_process_requests__int(aergo *instance, int timeout, bool *psucc
         }
       }
       if (ret < 0) {
+        request->processed = true;
         /* close the socket */
         close_socket(request->sock);
         request->sock = INVALID_SOCKET;
       }
     }
   }
+
+  if (main_request && main_request->processed == false) goto loc_again;
 
 loc_exit:
 
@@ -247,7 +256,7 @@ loc_failed:
 
 int aergo_process_requests(aergo *instance) {
   /* no timeout, just check and return immediately */
-  return aergo_process_requests__int(instance, 0, NULL);
+  return aergo_process_requests__int(instance, NULL, 0, NULL);
 }
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size){
@@ -301,9 +310,9 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
     success = true;
   } else {
     /* if the call is synchronous, wait for the response */
-    aergo_process_requests__int(instance, instance->timeout, &success);
+    aergo_process_requests__int(instance, request, instance->timeout, &success);
   }
 
-  DEBUG_PRINTLN("send_grpc_request OK");
+  DEBUG_PRINTF("send_grpc_request %s\n", success ? "OK" : "FAILED");
   return success;
 }

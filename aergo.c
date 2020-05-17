@@ -272,7 +272,7 @@ bool handle_blockchain_status_response(aergo *instance, struct request *request)
   int len = request->received;
   BlockchainStatus status = BlockchainStatus_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_blockchain_status_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -299,7 +299,7 @@ bool handle_account_state_response(aergo *instance, struct request *request) {
   int len = request->received;
   State account_state = State_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_account_state_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -333,7 +333,7 @@ bool handle_block_response(aergo *instance, struct request *request) {
   int len = request->received;
   Block block = Block_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_block_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -365,7 +365,7 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   int len = request->received;
   CommitResultList response = CommitResultList_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_transfer_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -404,7 +404,7 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   int len = request->received;
   CommitResultList response = CommitResultList_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_contract_call_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -443,7 +443,7 @@ bool handle_query_response(aergo *instance, struct request *request) {
   int len = request->received;
   SingleBytes response = SingleBytes_init_zero;
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_query_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -469,7 +469,7 @@ bool handle_event_response(aergo *instance, struct request *request) {
   contract_event event = {0};
   char raw_address[64];
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_event_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -526,7 +526,7 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
 
   memset(receipt, 0, sizeof(struct transaction_receipt));
 
-  DEBUG_PRINT_BUFFER("returned", data, len);
+  DEBUG_PRINT_BUFFER("handle_receipt_response", data, len);
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -1060,6 +1060,8 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   struct request *request = NULL;
   bool status = false;
 
+  DEBUG_PRINTLN("aergo_transfer");
+
   if (!instance || !from_account || !to_account || !amount || len <= 0) return false;
 
   if (check_blockchain_id_hash(instance) == false) return false;
@@ -1158,6 +1160,8 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   struct request *request = NULL;
   bool status = false;
 
+  DEBUG_PRINTLN("aergo_call_smart_contract");
+
   if (!instance || !account || !contract_address || !function) return false;
 
   if (check_blockchain_id_hash(instance) == false) return false;
@@ -1169,7 +1173,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   size = strlen(function) + strlen2(args);
   call_info = malloc(size + 32);
-  buffer = malloc(size + 256);
+  buffer = malloc(size + 300);
   if (!call_info || !buffer) goto loc_exit;
 
   if (args) {
@@ -1180,7 +1184,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
             "{\"Name\":\"%s\"}", function);
   }
 
-  size += 256;
+  size += 300;
   if (EncodeContractCall(buffer, &size, txn_hash, contract_address,
                          call_info, instance, account) == false) {
     goto loc_exit;
@@ -1248,11 +1252,13 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   struct request *request = NULL;
   bool status = false;
 
+  DEBUG_PRINTLN("aergo_query_smart_contract");
+
   if (!instance || !contract_address || !function) return false;
 
   size = strlen(function) + strlen2(args);
   query_info = malloc(size + 32);
-  buffer = malloc(size + 256);
+  buffer = malloc(size + 300);
   if (!query_info || !buffer) goto loc_exit;
 
   if (args) {
@@ -1263,7 +1269,7 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
             "{\"Name\":\"%s\"}", function);
   }
 
-  size += 256;
+  size += 300;
   if (EncodeQuery(buffer, &size, contract_address, query_info) == false) goto loc_exit;
 
   request = new_request(instance);
@@ -1337,6 +1343,8 @@ bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, ch
   size_t size;
   struct request *request = NULL;
 
+  DEBUG_PRINTLN("aergo_contract_events_subscribe");
+
   if (!instance || !contract_address || !event_name || !cb) return false;
 
   size = sizeof(buffer);
@@ -1362,6 +1370,8 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   uint8_t buffer[256];
   size_t size;
   struct request *request = NULL;
+
+  DEBUG_PRINTLN("aergo_get_receipt");
 
   if (!instance || !txn_hash) return false;
 
@@ -1400,6 +1410,8 @@ static bool aergo_get_block__int(aergo *instance, uint64_t blockNo){
   size_t size;
   struct request *request = NULL;
 
+  DEBUG_PRINTLN("aergo_get_block");
+
   if (!instance || blockNo==0) return false;
 
   size = sizeof(buffer);
@@ -1435,6 +1447,8 @@ bool aergo_block_stream_subscribe(aergo *instance){
   size_t size;
   struct request *request = NULL;
 
+  DEBUG_PRINTLN("aergo_block_stream_subscribe");
+
   if (!instance || !cb) return false;
 
   size = sizeof(buffer);
@@ -1458,6 +1472,8 @@ bool aergo_get_blockchain_status(aergo *instance){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
+
+  DEBUG_PRINTLN("aergo_get_blockchain_status");
 
   if (!instance) return false;
 
@@ -1484,6 +1500,8 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
+
+  DEBUG_PRINTLN("aergo_get_account_state");
 
   if (!instance || !account) return false;
 
@@ -1524,6 +1542,8 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
 
 aergo * aergo_connect(char *host, int port) {
   aergo *instance;
+
+  DEBUG_PRINTF("aergo_connect %s:%d\n", host, port);
 
   instance = malloc(sizeof(struct aergo));
   if (!instance) return NULL;

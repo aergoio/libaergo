@@ -45,6 +45,7 @@ struct request {
   char *response;
   int response_size;
   int received;
+  bool processed;
   bool keep_active;
 };
 
