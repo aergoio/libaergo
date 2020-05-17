@@ -383,7 +383,20 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  return (response.results.error == CommitStatus_TX_OK);
+  /* was the transaction OK? */
+  if (response.results.error == CommitStatus_TX_OK) {
+    /* request a transaction receipt */
+    if (request->callback) {
+      return aergo_get_receipt_async(instance, request->txn_hash,
+                                     request->callback, request->arg);
+    } else {
+      return aergo_get_receipt(instance, request->txn_hash,
+                               (transaction_receipt *)request->return_ptr);
+    }
+  }
+
+  // xx = response.results.error;
+  return false;
 }
 
 bool handle_contract_call_response(aergo *instance, struct request *request) {
@@ -409,7 +422,20 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   /* Print the data contained in the message */
   DEBUG_PRINTF("response error status: %u\n", response.results.error);
 
-  return (response.results.error == CommitStatus_TX_OK);
+  /* was the transaction OK? */
+  if (response.results.error == CommitStatus_TX_OK) {
+    /* request a transaction receipt */
+    if (request->callback) {
+      return aergo_get_receipt_async(instance, request->txn_hash,
+                                     request->callback, request->arg);
+    } else {
+      return aergo_get_receipt(instance, request->txn_hash,
+                               (transaction_receipt *)request->return_ptr);
+    }
+  }
+
+  // xx = response.results.error;
+  return false;
 }
 
 bool handle_query_response(aergo *instance, struct request *request) {
@@ -773,7 +799,6 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * inst
 
 bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *contract_address, char *call_info, aergo *instance, aergo_account *account) {
   struct txn txn;
-  char out[64]={0};
 
   /* increment the account nonce */
   account->nonce++;
@@ -789,9 +814,14 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *co
   txn.type = TxType_CALL;
   txn.chainIdHash = blockchain_id_hash;
 
+#ifdef DEBUG_MESSAGES
+  {
+  char out[64]={0};
   encode_address(txn.account, sizeof txn.account, out, sizeof out);
   DEBUG_PRINTF("account address: %s\n", out);
   DEBUG_PRINTF("account nonce: %llu\n", account->nonce);
+  }
+#endif
 
   if (sign_transaction(instance, account, &txn) == false) {
     return false;
@@ -1146,7 +1176,8 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   }
 
   size += 256;
-  if (EncodeContractCall(buffer, &size, txn_hash, contract_address, call_info, instance, account)) {
+  if (EncodeContractCall(buffer, &size, txn_hash, contract_address,
+                         call_info, instance, account) == false) {
     goto loc_exit;
   }
 
