@@ -123,8 +123,8 @@ loc_again:
 }
 
 
-static bool http_strip_header(request *request){
-  char *ptr;
+static bool http_strip_header(aergo *instance, request *request){
+  char *ptr, *error_msg;
   int header_size;
   int data_size;
 
@@ -140,11 +140,31 @@ static bool http_strip_header(request *request){
   DEBUG_PRINTF("-----\n%s\n-----\n", request->response);
 #endif
 
+  error_msg = strstr(request->response, "Grpc-Message: ");
+  if (error_msg) {
+    error_msg += strlen("Grpc-Message: ");
+    ptr = strstr(error_msg, "\r\n");
+    if (ptr) *ptr = 0;
+    DEBUG_PRINTF("  error: %s\n", error_msg);
+    if (instance->error_handler) {
+      instance->error_handler(instance->error_handler_arg, error_msg);
+    }
+    return false;
+  }
+
   header_size = ptr - request->response;
   ptr += 4;
 
   /* removes the additional data sent before the content */
   ptr = strstr(ptr, "\r\n");
+  if (!ptr) {
+    DEBUG_PRINTLN("returned content in unexpected format");
+    if (instance->error_handler) {
+      instance->error_handler(instance->error_handler_arg,
+            "returned content in unexpected format");
+    }
+    return false;
+  }
   ptr += 2;
 
   /* gets the size of the first data stream */
@@ -207,7 +227,7 @@ loc_again:
       if (ret > 0) {
         request->processed = true;
         /* remove the HTTP header */
-        if (http_strip_header(request)) {
+        if (http_strip_header(instance, request)) {
           /* parse the received data */
           bool success = request->process_response(instance, request);
           if (request == main_request && psuccess) {

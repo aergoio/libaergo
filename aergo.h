@@ -9,6 +9,10 @@ typedef struct aergo aergo;
 aergo * aergo_connect(char *host, int port);
 void aergo_free(aergo *instance);
 
+typedef void (*error_handler_cb)(void *arg, char *error_msg);
+
+void aergo_set_error_handler(aergo *instance, error_handler_cb cb, void *arg);
+
 
 // Accounts
 

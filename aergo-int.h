@@ -5,7 +5,7 @@
 #include <errno.h>
 
 #ifdef _WIN32
-#include <winsock.h>
+#include <winsock2.h>
 #else
 #include <sys/socket.h>  /* socket, connect */
 #include <sys/select.h>
@@ -57,6 +57,8 @@ struct aergo {
   secp256k1_context *ecdsa;
   uint8_t blockchain_id_hash[32];
   int timeout;
+  error_handler_cb error_handler;
+  void *error_handler_arg;
   request *requests;
 };
 
