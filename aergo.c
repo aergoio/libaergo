@@ -664,10 +664,15 @@ bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
   ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
   if (ret == false) goto loc_failed;
 
+#if 0
   ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
   if (ret == false) goto loc_failed;
 
   txn->sig_len = 64;  /* size of the compact signature format */
+#endif
+
+  ret = secp256k1_ecdsa_signature_serialize_der(instance->ecdsa, txn->sign, &txn->sig_len, &sig);
+  if (ret == false) goto loc_failed;
 
   DEBUG_PRINT_BUFFER("signature", txn->sign, txn->sig_len);
   return true;
