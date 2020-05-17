@@ -41,11 +41,13 @@ struct request {
   void *return_ptr;
   int return_size;
   process_response_cb process_response;
+  process_response_cb process_error;
   SOCKET sock;
   char *response;
   int response_size;
   int received;
   bool processed;
+  bool response_ok;
   bool keep_active;
 };
 

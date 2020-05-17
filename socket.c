@@ -229,6 +229,7 @@ loc_again:
         /* remove the HTTP header */
         if (http_strip_header(instance, request)) {
           /* parse the received data */
+          request->response_ok = true;
           bool success = request->process_response(instance, request);
           if (request == main_request && psuccess) {
             *psuccess = success;
@@ -241,6 +242,12 @@ loc_again:
       }
       if (ret < 0) {
         request->processed = true;
+        if (!request->response_ok && request->process_error) {
+          bool success = request->process_error(instance, request);
+          if (request == main_request && psuccess) {
+            *psuccess = success;
+          }
+        }
         /* close the socket */
         close_socket(request->sock);
         request->sock = INVALID_SOCKET;

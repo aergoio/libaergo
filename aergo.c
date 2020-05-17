@@ -1366,6 +1366,21 @@ bool aergo_contract_events_subscribe(aergo *instance, char *contract_address, ch
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+static bool on_failed_receipt(aergo *instance, struct request *request) {
+
+  DEBUG_PRINTLN("on_failed_receipt");
+
+  /* request a new transaction receipt */
+  if (request->callback) {
+    return aergo_get_receipt_async(instance, request->txn_hash,
+                                   request->callback, request->arg);
+  } else {
+    return aergo_get_receipt(instance, request->txn_hash,
+                             (transaction_receipt *)request->return_ptr);
+  }
+
+}
+
 static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt){
   uint8_t buffer[256];
   size_t size;
@@ -1387,6 +1402,7 @@ static bool aergo_get_receipt__int(aergo *instance, char *txn_hash, transaction_
   request->callback = cb;
   request->arg = arg;
   request->return_ptr = receipt;
+  request->process_error = on_failed_receipt;
 
   return send_grpc_request(instance, "GetReceipt", request, handle_receipt_response);
 }
