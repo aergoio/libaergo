@@ -443,6 +443,14 @@ bool handle_query_response(aergo *instance, struct request *request) {
 
   DEBUG_PRINT_BUFFER("handle_query_response", data, len);
 
+  if (request->callback) {
+    //assert(request->return_ptr == NULL);
+    //assert(request->return_size == 0);
+    request->return_size = len;
+    request->return_ptr = malloc(request->return_size);
+    if (!request->return_ptr) return false;
+  }
+
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
@@ -455,6 +463,13 @@ bool handle_query_response(aergo *instance, struct request *request) {
   if (pb_decode(&stream, SingleBytes_fields, &response) == false) {
     DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
     return false;
+  }
+
+  if (request->callback) {
+    query_smart_contract_cb callback = (query_smart_contract_cb) request->callback;
+    callback(request->arg, request->return_ptr, request->return_size);
+    free(request->return_ptr);
+    request->return_ptr = NULL;
   }
 
   return true;
@@ -519,12 +534,17 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   char *data = request->response;
   int len = request->received;
   Receipt response = Receipt_init_zero;
-  transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
+  transaction_receipt *receipt, on_stack_receipt;
   char raw_address[64];
 
-  memset(receipt, 0, sizeof(struct transaction_receipt));
-
   DEBUG_PRINT_BUFFER("handle_receipt_response", data, len);
+
+  if (request->callback) {
+    receipt = &on_stack_receipt;
+  } else {
+    receipt = (transaction_receipt *) request->return_ptr;
+  }
+  memset(receipt, 0, sizeof(struct transaction_receipt));
 
   /* Create a stream that reads from the buffer */
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
@@ -568,6 +588,11 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   receipt->blockNo = response.blockNo;
   receipt->txIndex = response.txIndex;
   receipt->feeDelegation = response.feeDelegation;
+
+  if (request->callback) {
+    transaction_receipt_cb callback = (transaction_receipt_cb) request->callback;
+    callback(request->arg, receipt);
+  }
 
   return true;
 }
