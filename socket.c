@@ -182,7 +182,7 @@ static bool http_strip_header(aergo *instance, request *request){
 }
 
 
-static int aergo_process_requests__int(aergo *instance, request *main_request, int timeout, bool *psuccess) {
+static int aergo_process_requests__int(aergo *instance, int timeout, request *main_request, bool *psuccess) {
   fd_set readset;
   struct timeval tv;
   unsigned int max;
@@ -281,9 +281,9 @@ loc_failed:
 
 }
 
-int aergo_process_requests(aergo *instance) {
+int aergo_process_requests(aergo *instance, int timeout) {
   /* no timeout, just check and return immediately */
-  return aergo_process_requests__int(instance, NULL, 0, NULL);
+  return aergo_process_requests__int(instance, timeout, NULL, NULL);
 }
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size){
@@ -337,7 +337,7 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
     success = true;
   } else {
     /* if the call is synchronous, wait for the response */
-    aergo_process_requests__int(instance, request, instance->timeout, &success);
+    aergo_process_requests__int(instance, instance->timeout, request, &success);
   }
 
   DEBUG_PRINTF("send_grpc_request %s\n", success ? "OK" : "FAILED");
