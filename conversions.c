@@ -76,8 +76,8 @@ int string_to_bignum(uint8_t *str, int len, uint8_t *out, int outlen) {
     // convert it to big endian variable size integer
     mbedtls_mpi_init(&value);
     if (mbedtls_mpi_read_string(&value, 10, integer) != 0) goto loc_failed;
-    if (mbedtls_mpi_write_binary(&value, out, outlen) != 0) goto loc_failed;
     len = mbedtls_mpi_size(&value);
+    if (mbedtls_mpi_write_binary(&value, out, len) != 0) goto loc_failed;
     mbedtls_mpi_free(&value);
 
     return len;
