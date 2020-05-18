@@ -239,7 +239,7 @@ bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *
 
     DEBUG_PRINTF("encode_string '%s'\n", str);
 
-    if (!arg) return true;
+    if (!str) return true;
 
     if (!pb_encode_tag_for_field(stream, field))
         return false;
@@ -635,6 +635,8 @@ bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signat
   uint8_t buf[1024], *ptr;
   size_t len = 0;
 
+  DEBUG_PRINTLN("calculate_tx_hash");
+
   ptr = buf;
 
   memcpy(ptr, &txn->nonce, 8); ptr += 8;
@@ -676,7 +678,7 @@ bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
   uint8_t hash[32];
   bool ret;
 
-  DEBUG_PRINTF("sign_transaction\n");
+  DEBUG_PRINTLN("sign_transaction");
 
   calculate_tx_hash(txn, hash, false);
 
@@ -707,6 +709,8 @@ loc_failed:
 bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
   struct txn *txn = *(struct txn **)arg;
   Tx message = Tx_init_zero;
+
+  DEBUG_PRINTLN("encode_1_transaction");
 
   if (!pb_encode_tag_for_field(stream, field))
       return false;
@@ -764,6 +768,8 @@ bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct t
   TxList message = TxList_init_zero;
   uint32_t size;
 
+  DEBUG_PRINTLN("encode_transaction");
+
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
@@ -798,6 +804,8 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * inst
   struct txn txn;
   char out[64]={0};
 
+  DEBUG_PRINTLN("EncodeTransfer");
+
   if (!amount || amount_len < 1) return false;
 
   /* increment the account nonce */
@@ -827,6 +835,8 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * inst
 
 bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, char *contract_address, char *call_info, aergo *instance, aergo_account *account) {
   struct txn txn;
+
+  DEBUG_PRINTLN("EncodeContractCall");
 
   /* increment the account nonce */
   account->nonce++;
@@ -862,6 +872,8 @@ bool EncodeQuery(uint8_t *buffer, size_t *psize, char *contract_address, char *q
   Query message = Query_init_zero;
   uint32_t size;
 
+  DEBUG_PRINTLN("EncodeQuery");
+
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
@@ -889,6 +901,8 @@ bool EncodeQuery(uint8_t *buffer, size_t *psize, char *contract_address, char *q
 bool EncodeFilterInfo(uint8_t *buffer, size_t *psize, char *contract_address, char *event_name){
   FilterInfo message = FilterInfo_init_zero;
   uint32_t size;
+
+  DEBUG_PRINTLN("EncodeFilterInfo");
 
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
@@ -932,6 +946,8 @@ bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, aergo_account *account
   SingleBytes message = SingleBytes_init_zero;
   uint32_t size;
 
+  DEBUG_PRINTLN("EncodeAccountAddress");
+
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
@@ -958,6 +974,8 @@ bool EncodeAccountAddress(uint8_t *buffer, size_t *psize, aergo_account *account
 bool EncodeTxnHash(uint8_t *buffer, size_t *psize, char *txn_hash){
   SingleBytes message = SingleBytes_init_zero;
   uint32_t size;
+
+  DEBUG_PRINTLN("EncodeTxnHash");
 
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
@@ -988,6 +1006,8 @@ bool EncodeBlockNo(uint8_t *buffer, size_t *psize, uint64_t blockNo){
   //  Block block = Block_init_zero;
   uint32_t size;
 
+  DEBUG_PRINTLN("EncodeBlockNo");
+
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
 
@@ -1013,6 +1033,8 @@ bool EncodeBlockNo(uint8_t *buffer, size_t *psize, uint64_t blockNo){
 bool EncodeEmptyMessage(uint8_t *buffer, size_t *psize){
   Empty message = Empty_init_zero;
   uint32_t size;
+
+  DEBUG_PRINTLN("EncodeEmptyMessage");
 
   /* Create a stream that writes to the buffer */
   pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
