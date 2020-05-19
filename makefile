@@ -118,6 +118,7 @@ install:
 	cp $(LIBRARY) $(LIBPATH)
 	cd $(LIBPATH) && ln -sf $(LIBRARY) $(LIBNICK)
 	cp aergo.h $(INCPATH)
+	cp aergo.hpp $(INCPATH)
 
 clean:
 	rm -f *.o *.a $(LIBNICK) $(LIBRARY)
