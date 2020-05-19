@@ -23,7 +23,7 @@ sudo make install
 
 ## Dependencies
 
-It depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf),
+It depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
 which can be installed with:
 
 ```
@@ -62,16 +62,27 @@ and loading it into the account object.
 ## API
 
 While the documentation is not ready please check the
-[exported functions](https://github.com/aergoio/herac/blob/master/aergo.h)
+[exported functions](https://github.com/aergoio/herac/blob/master/aergo.h),
+the 
+[C++ class header](https://github.com/aergoio/herac/blob/master/aergo.hpp)
 and the examples.
 
 
 ## Examples
 
-Check the [usage examples](https://github.com/aergoio/herac/tree/master/examples)
+There are many [usage examples](https://github.com/aergoio/herac/tree/master/examples)
+available for each supported language, for synchronous and asynchronous calls.
 
 Compiling an example code:
 
+### C
+
 ```
-gcc examples/contract_call/contract_call.c -I. -L. -laergo -o call
+gcc examples/contract_call/contract_call.c -laergo -o contract_call
+```
+
+### C++
+
+```
+g++ examples/contract_call/contract_call.cpp -std=c++17 -laergo -o contract_call
 ```
