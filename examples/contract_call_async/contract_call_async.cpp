@@ -1,3 +1,4 @@
+#include <cstring>
 #include "aergo.hpp"
 
 unsigned char privkey[32] = {
@@ -25,11 +26,10 @@ void on_smart_contract_result(void *arg, transaction_receipt *receipt){
 
 int main() {
   Aergo aergo("testnet-api.aergo.io", 7845);
-  aergo_account account;
+  aergo_account account = {0};
 
   /* load the private key in the account */
-  memset(&account, 0, sizeof(aergo_account));
-  memcpy(account.privkey, privkey, 32);
+  std::memcpy(account.privkey, privkey, 32);
 
   /* get the account state (public key, address, balance, nonce...) */
   if (aergo.get_account_state(&account) == true) {
