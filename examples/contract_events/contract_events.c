@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "aergo.h"
 
-void on_contract_event(contract_event *event){
+void on_contract_event(void *arg, contract_event *event){
 
   puts  ("");
   puts  ("------------------------------------");
@@ -34,7 +34,7 @@ int main() {
     instance,
     "AmgMhLWDzwL2Goet6k4vxKniZksuEt3Dy8ULmiyDPpSmgJ5CgGZ4",
     "",
-    on_contract_event);
+    on_contract_event, NULL);
 
   if (ret == true) {
     puts("waiting for events...");
