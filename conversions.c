@@ -11,7 +11,7 @@ static const char hexdigits[] = {
 
 // convert a value from big endian variable integer to string with
 // decimal point. uses 18 decimal digits
-int bignum_to_string(uint8_t *buf, int len, uint8_t *out, int outlen) {
+int bignum_to_string(const uint8_t *buf, int len, uint8_t *out, int outlen) {
     mbedtls_mpi value;
     char tmp[36];
     size_t slen;
@@ -44,7 +44,7 @@ loc_failed:
 
 // convert a value from string format to big endian variable integer.
 // the string can optionally have a decimal point. uses 18 decimal digits
-int string_to_bignum(uint8_t *str, int len, uint8_t *out, int outlen) {
+int string_to_bignum(const uint8_t *str, int len, uint8_t *out, int outlen) {
     mbedtls_mpi value;
     uint8_t integer[36], decimal[36], *p;
     int i;
@@ -87,7 +87,7 @@ loc_failed:
     return -1;
 }
 
-bool arguments_to_json(char *buf, int bufsize, char *types, va_list ap){
+bool arguments_to_json(char *buf, int bufsize, const char *types, va_list ap){
   char c, *dest;
   int i, dsize;
 

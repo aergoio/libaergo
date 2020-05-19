@@ -67,7 +67,7 @@ static: libaergo.a
 
 
 aergo.o: account.c account.h aergo-int.h aergo.c aergo.h base58.c base58.h blockchain.pb.c blockchain.pb.h conversions.c endianess.c linked_list.c sha256.c socket.c mbedtls/bignum.c nanopb/pb_common.c nanopb/pb_encode.c nanopb/pb_decode.c
-	$(CC) -c  aergo.c  $(CFLAGS) -Inanopb -std=c99 -Wno-pointer-sign
+	$(CC) -c  aergo.c  $(CFLAGS) -Inanopb -std=c99 -Wno-pointer-sign -Wno-incompatible-pointer-types-discards-qualifiers
 
 
 libaergo.a: aergo.o
