@@ -22,6 +22,7 @@ ifeq ($(TARGET_OS),Windows)
 	LIBRARY  := aergo-0.1.dll
 	WINLIB   := $(IMPLIB).lib
 	LDFLAGS  := $(LDFLAGS) -static-libgcc -static-libstdc++
+	WARNINGS = -Wno-pointer-sign -Wno-discarded-qualifiers
 else ifeq ($(TARGET_OS),iPhoneOS)
 	LIBRARY = libaergo.dylib
 	CFLAGS += -fPIC
@@ -35,10 +36,12 @@ else
 		INSTNAME = $(LIBPATH)/$(LIBNICK)
 		CURR_VERSION   = 0.1.0
 		COMPAT_VERSION = 0.1.0
+		WARNINGS = -Wno-pointer-sign -Wno-incompatible-pointer-types-discards-qualifiers
 	else
 		LIBRARY  = libaergo.so.0.1
 		LIBNICK  = libaergo.so
 		SONAME   = $(LIBNICK)
+		WARNINGS = -Wno-pointer-sign -Wno-discarded-qualifiers
 	endif
 	IMPLIB   = aergo
 	prefix  ?= /usr/local
@@ -67,7 +70,7 @@ static: libaergo.a
 
 
 aergo.o: account.c account.h aergo-int.h aergo.c aergo.h base58.c base58.h blockchain.pb.c blockchain.pb.h conversions.c endianess.c linked_list.c sha256.c socket.c mbedtls/bignum.c nanopb/pb_common.c nanopb/pb_encode.c nanopb/pb_decode.c
-	$(CC) -c  aergo.c  $(CFLAGS) -Inanopb -std=c99 -Wno-pointer-sign -Wno-incompatible-pointer-types-discards-qualifiers
+	$(CC) -c  aergo.c  $(CFLAGS) -Inanopb -std=c99 $(WARNINGS)
 
 
 libaergo.a: aergo.o

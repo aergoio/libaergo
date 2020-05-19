@@ -1,6 +1,7 @@
 #include "aergo.h"
 #include "aergo-int.h"
 
+#include <inttypes.h>
 #include "stdarg.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -12,7 +13,7 @@
 
 static void print_buffer(const char *title, unsigned char *data, size_t len){
   size_t i;
-  DEBUG_PRINTF("%s (%d bytes) ", title, len);
+  DEBUG_PRINTF("%s (%zu bytes) ", title, len);
   for(i=0; i<len; i++){
     DEBUG_PRINTF(" %02x", data[i]);
     if(i % 16 == 15) DEBUG_PRINTF("\n");
@@ -42,8 +43,8 @@ size_t strlen2(const char *str){
 #include "endianess.c"
 #include "sha256.c"
 #include "base58.c"
-#include "conversions.c"
 #include "mbedtls/bignum.c"
+#include "conversions.c"
 
 #include "account.c"
 #include "socket.c"
@@ -62,7 +63,7 @@ struct blob {
 bool print_string(pb_istream_t *stream, const pb_field_t *field, void **arg){
     uint8_t buffer[1024] = {0};
 
-    DEBUG_PRINTF("print_string stream->bytes_left=%d field=%p\n", stream->bytes_left, field);
+    DEBUG_PRINTF("print_string stream->bytes_left=%zu field=%p\n", stream->bytes_left, field);
 
     /* We could read block-by-block to avoid the large buffer... */
     if (stream->bytes_left > sizeof(buffer) - 1)
@@ -83,7 +84,7 @@ bool read_string(pb_istream_t *stream, const pb_field_t *field, void **arg){
     size_t len = stream->bytes_left;
 
     if (!str) return true;
-    DEBUG_PRINTF("read_string bytes_left=%d str->size=%d\n", stream->bytes_left, str->size);
+    DEBUG_PRINTF("read_string bytes_left=%zu str->size=%zu\n", stream->bytes_left, str->size);
 
     /* We could read block-by-block to avoid the large buffer... */
     if (stream->bytes_left > str->size){
@@ -105,7 +106,7 @@ bool read_blob(pb_istream_t *stream, const pb_field_t *field, void **arg){
 
     DEBUG_PRINTF("read_blob arg=%p\n", blob);
     if (!blob) return true;
-    DEBUG_PRINTF("read_blob bytes_left=%d blob->size=%d\n", stream->bytes_left, blob->size);
+    DEBUG_PRINTF("read_blob bytes_left=%zu blob->size=%zu\n", stream->bytes_left, blob->size);
 
     /* We could read block-by-block to avoid the large buffer... */
     if (stream->bytes_left > blob->size){
@@ -126,7 +127,7 @@ bool print_blob(pb_istream_t *stream, const pb_field_t *field, void **arg)
     int len = stream->bytes_left;
     int i;
 
-    //DEBUG_PRINTF("print_blob stream->bytes_left=%d field=%p\n", stream->bytes_left, field);
+    //DEBUG_PRINTF("print_blob stream->bytes_left=%zu field=%p\n", stream->bytes_left, field);
 
     /* We could read block-by-block to avoid the large buffer... */
     if (stream->bytes_left > sizeof(buffer) - 1)
@@ -147,7 +148,7 @@ bool read_bignum_to_double(pb_istream_t *stream, const pb_field_t *field, void *
 
     DEBUG_PRINTF("read_bignum_to_double arg=%p\n", pvalue);
     if (!pvalue) return true;
-    DEBUG_PRINTF("read_bignum_to_double bytes_left=%d\n", stream->bytes_left);
+    DEBUG_PRINTF("read_bignum_to_double bytes_left=%zu\n", stream->bytes_left);
 
     if (stream->bytes_left > sizeof(buf)){
         DEBUG_PRINTF("FAILED! read_bignum_to_double\n");
@@ -180,7 +181,7 @@ bool encode_fixed64(pb_ostream_t *stream, const pb_field_t *field, void * const 
     uint64_t value = **(uint64_t**)arg;
     uint64_t value2;
 
-    DEBUG_PRINTF("encode_fixed64 - value=%llu\n", value);
+    DEBUG_PRINTF("encode_fixed64 - value=%" PRIu64 "\n", value);
 
     if (!pb_encode_tag_for_field(stream, field))
         return false;
@@ -197,7 +198,7 @@ bool encode_varuint64(pb_ostream_t *stream, const pb_field_t *field, void * cons
     uint8_t *ptr;
     size_t len;
 
-    DEBUG_PRINTF("encode_varuint64 - value=%llu\n", value);
+    DEBUG_PRINTF("encode_varuint64 - value=%" PRIu64 "\n", value);
 
     if (!pb_encode_tag_for_field(stream, field))
         return false;
@@ -210,7 +211,7 @@ bool encode_varuint64(pb_ostream_t *stream, const pb_field_t *field, void * cons
     len = 8;
     while( *ptr==0 && len>1 ){ ptr++; len--; }
 
-    DEBUG_PRINTF("encode_varuint64 - len=%u\n", len);
+    DEBUG_PRINTF("encode_varuint64 - len=%zu\n", len);
 
     return pb_encode_string(stream, ptr, len);
 }
@@ -223,7 +224,7 @@ bool encode_account_address(pb_ostream_t *stream, const pb_field_t *field, void 
     DEBUG_PRINTF("encode_account_address '%s'\n", str);
 
     if (strlen(str) != EncodedAddressLength) {
-      DEBUG_PRINTF("Lenght of address is invalid: %d. It should be %d\n", strlen(str), EncodedAddressLength);
+      DEBUG_PRINTF("Lenght of address is invalid: %zu. It should be %d\n", strlen(str), EncodedAddressLength);
     }
 
     res = decode_address(str, strlen(str), decoded, sizeof(decoded));
@@ -323,7 +324,7 @@ bool handle_account_state_response(aergo *instance, struct request *request) {
   request->account->nonce = account_state.nonce;
 
   /* Print the data contained in the message */
-  DEBUG_PRINTF("Account Nonce: %llu\n", account_state.nonce);
+  DEBUG_PRINTF("Account Nonce: %" PRIu64 "\n", account_state.nonce);
 
   return true;
 }
@@ -353,9 +354,9 @@ bool handle_block_response(aergo *instance, struct request *request) {
   }
 
   /* Print the data contained in the message */
-  DEBUG_PRINTF("Block number: %llu\n", block.header.blockNo);
-  DEBUG_PRINTF("Block timestamp: %llu\n", block.header.timestamp);
-  DEBUG_PRINTF("Block confirms: %llu\n", block.header.confirms);
+  DEBUG_PRINTF("Block number: %" PRIu64 "\n", block.header.blockNo);
+  DEBUG_PRINTF("Block timestamp: %" PRIu64 "\n", block.header.timestamp);
+  DEBUG_PRINTF("Block confirms: %" PRIu64 "\n", block.header.confirms);
 
   return true;
 }
@@ -824,7 +825,7 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * inst
 
   encode_address(txn.account, sizeof txn.account, out, sizeof out);
   DEBUG_PRINTF("account address: %s\n", out);
-  DEBUG_PRINTF("account nonce: %llu\n", account->nonce);
+  DEBUG_PRINTF("account nonce: %" PRIu64 "\n", account->nonce);
 
   if (sign_transaction(instance, account, &txn) == false) {
     return false;
@@ -857,7 +858,7 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, const ch
   char out[64]={0};
   encode_address(txn.account, sizeof txn.account, out, sizeof out);
   DEBUG_PRINTF("account address: %s\n", out);
-  DEBUG_PRINTF("account nonce: %llu\n", account->nonce);
+  DEBUG_PRINTF("account nonce: %" PRIu64 "\n", account->nonce);
   }
 #endif
 
@@ -1183,7 +1184,7 @@ bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_acc
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str),
-           "%lld.%018lld", integer, decimal);
+           "%" PRIu64 ".%018" PRIu64, integer, decimal);
 
   return aergo_transfer_str(instance, receipt, from_account, to_account, amount_str);
 }
@@ -1192,7 +1193,7 @@ bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb cb, void *
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str),
-           "%lld.%018lld", integer, decimal);
+           "%" PRIu64 ".%018" PRIu64, integer, decimal);
 
   return aergo_transfer_str_async(instance, cb, arg, from_account, to_account, amount_str);
 }

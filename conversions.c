@@ -1,8 +1,8 @@
 //#include <stdio.h>
 //#include <stdint.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include "mbedtls/bignum.h"
+//#include <stdarg.h>
+//#include <stdbool.h>
+//#include "mbedtls/bignum.h"
 
 static const char hexdigits[] = {
   '0', '1', '2', '3', '4', '5', '6', '7',
@@ -114,7 +114,7 @@ bool arguments_to_json(char *buf, int bufsize, const char *types, va_list ap){
     }else if( c=='l' ){
       if (dsize < 12) goto loc_invalid;
       if (i > 0) *dest++ = ',';
-      snprintf(dest, dsize, "%lld", va_arg(ap, int64_t));
+      snprintf(dest, dsize, "%" PRIu64, va_arg(ap, int64_t));
       dest += strlen(dest);
     //}else if( c=='f' ){  -- floats are promoted to double
     }else if( c=='d' ){
