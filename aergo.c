@@ -1607,6 +1607,11 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
 aergo * aergo_connect(const char *host, int port) {
   aergo *instance;
 
+#ifdef _WIN32
+  WSADATA wsa_data;
+  WSAStartup(MAKEWORD(2,2), &wsa_data);
+#endif
+
   DEBUG_PRINTF("aergo_connect %s:%d\n", host, port);
 
   instance = malloc(sizeof(struct aergo));
