@@ -25,6 +25,18 @@ sudo make install
 
 ## Dependencies
 
+On Linux:
+
+```
+sudo apt-get install gcc make automake libtool -y
+```
+
+On Mac:
+
+```
+brew install automake libtool
+```
+
 It depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
 which can be installed with:
 
@@ -46,12 +58,6 @@ You can link your application to the external dynamic library.
 On some languages you can also include the static library in your project instead of linking to the dynamic library.
 
 
-## Private keys
-
-For now your application is responsible for generating a true random private key, storing it into persistent storage
-and loading it into the account object.
-
-
 ## Supported Features
 
 * Get Account State
@@ -63,11 +69,9 @@ and loading it into the account object.
 
 ## API
 
-While the documentation is not ready please check the
-[exported functions](https://github.com/aergoio/herac/blob/master/aergo.h),
-the 
-[C++ class header](https://github.com/aergoio/herac/blob/master/aergo.hpp)
-and the examples.
+* [documentation](https://github.com/aergoio/libaergo/wiki/en---Documentation---C)
+* [exported functions](https://github.com/aergoio/herac/blob/master/aergo.h)
+* [C++ class header](https://github.com/aergoio/herac/blob/master/aergo.hpp)
 
 
 ## Examples
