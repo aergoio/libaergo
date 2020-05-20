@@ -25,7 +25,9 @@ jobs:
     - name: build
       run: make debug
     - name: install
-      run: sudo make install
+      run: |
+        sudo make install
+        sudo ldconfig
     - name: test C compilation
       run: gcc examples/contract_query/contract_query.c -laergo -o contract_query
     - name: test C execution
