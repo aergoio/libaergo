@@ -55,7 +55,7 @@ int http_send_request(SOCKET sock, char *request, int request_size) {
   sent = 0;
 
   do {
-    bytes = write(sock, request+sent, total-sent);
+    bytes = send(sock, request+sent, total-sent, 0);
     if (bytes < 0)
       return -1;
     if (bytes == 0)
@@ -91,7 +91,7 @@ loc_again:
   if (request->received == total) goto loc_realloc;
 
   do {
-    bytes = read(request->sock, request->response + request->received, total - request->received);
+    bytes = recv(request->sock, request->response + request->received, total - request->received, 0);
     DEBUG_PRINTF("received %d bytes\n", bytes);
     if (bytes < 0) {
       int err = errno;

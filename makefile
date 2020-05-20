@@ -21,6 +21,7 @@ ifeq ($(TARGET_OS),Windows)
 	IMPLIB   := aergo-0.1
 	LIBRARY  := aergo-0.1.dll
 	WINLIB   := $(IMPLIB).lib
+	CFLAGS   := $(CFLAGS) -DMBEDTLS_PLATFORM_C
 	LDFLAGS  := $(LDFLAGS) -static-libgcc -static-libstdc++
 	WARNINGS = -Wno-pointer-sign -Wno-discarded-qualifiers
 else ifeq ($(TARGET_OS),iPhoneOS)
