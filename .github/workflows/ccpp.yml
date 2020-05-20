@@ -13,6 +13,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install dependencies
+      run: |
+        git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
+        cd secp256k1-vrf
+        ./autogen.sh
+        ./configure
+        make
+        sudo make install
+        cd ..
     - name: build
       run: make debug
     - name: install
