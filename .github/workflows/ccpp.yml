@@ -19,8 +19,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: mac
-      if: matrix.platform == "macos-latest"
-      run: brew install m4 automake libtool
+      if: ${{ matrix.platform == 'macos-latest' }}
+      run: brew install automake
     - name: install dependencies
       run: |
         git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
