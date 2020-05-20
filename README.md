@@ -1,3 +1,5 @@
+![C/C++ CI](https://github.com/aergoio/libaergo/workflows/C/C++%20CI/badge.svg)
+
 # libaergo
 
 This library is used to interface with the Aergo blockchains
