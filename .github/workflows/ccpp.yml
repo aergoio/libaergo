@@ -19,7 +19,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: mac
-      if: matrix.platform == macos-latest
+      if: matrix.platform == "macos-latest"
       run: brew install m4 automake libtool
     - name: install dependencies
       run: |
