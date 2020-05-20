@@ -1,4 +1,4 @@
-![C/C++ CI](https://github.com/aergoio/libaergo/workflows/C/C++%20CI/badge.svg)
+[![C/C++ CI](https://github.com/aergoio/libaergo/workflows/C/C++%20CI/badge.svg)](https://github.com/aergoio/libaergo/actions)
 
 # libaergo
 
