@@ -1,0 +1,27 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: make debug
+    - name: install
+      run: make install
+    - name: test C compilation
+      run: gcc examples/contract_query/contract_query.c -laergo -o contract_query
+    - name: test C execution
+      run: ./contract_query
+    - name: test C++ compilation
+      run: g++ examples/contract_query/contract_query.cpp -laergo -o contract_query_cpp
+    - name: test C++ execution
+      run: ./contract_query_cpp
