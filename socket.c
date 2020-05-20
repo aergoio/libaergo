@@ -281,7 +281,7 @@ loc_failed:
 
 }
 
-int aergo_process_requests(aergo *instance, int timeout) {
+EXPORTED int aergo_process_requests(aergo *instance, int timeout) {
   /* no timeout, just check and return immediately */
   return aergo_process_requests__int(instance, timeout, NULL, NULL);
 }
