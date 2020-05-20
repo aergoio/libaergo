@@ -33,6 +33,6 @@ jobs:
     - name: test C execution
       run: ./contract_query
     - name: test C++ compilation
-      run: g++ examples/contract_query/contract_query.cpp -laergo -o contract_query_cpp
+      run: g++ examples/contract_query/contract_query.cpp -std=c++17 -laergo -o contract_query_cpp
     - name: test C++ execution
       run: ./contract_query_cpp
