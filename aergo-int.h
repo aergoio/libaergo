@@ -25,6 +25,12 @@ typedef struct sockaddr SOCKADDR;
 #include "secp256k1-vrf.h"
 
 
+#ifdef _WIN32
+#define EXPORTED __declspec(dllexport)
+#else
+#define EXPORTED __attribute__((visibility("default")))
+#endif
+
 
 typedef struct request request;
 

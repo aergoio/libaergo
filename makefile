@@ -26,10 +26,10 @@ ifeq ($(TARGET_OS),Windows)
 	WARNINGS = -Wno-pointer-sign -Wno-discarded-qualifiers
 else ifeq ($(TARGET_OS),iPhoneOS)
 	LIBRARY = libaergo.dylib
-	CFLAGS += -fPIC
+	CFLAGS += -fPIC -fvisibility=hidden
 else ifeq ($(TARGET_OS),iPhoneSimulator)
 	LIBRARY = libaergo.dylib
-	CFLAGS += -fPIC
+	CFLAGS += -fPIC -fvisibility=hidden
 else
 	ifeq ($(TARGET_OS),Mac)
 		LIBRARY  = libaergo.0.dylib
@@ -49,7 +49,7 @@ else
 	LIBPATH  = $(prefix)/lib
 	INCPATH  = $(prefix)/include
 	EXEPATH  = $(prefix)/bin
-	CFLAGS  += -fPIC
+	CFLAGS  += -fPIC -fvisibility=hidden
 endif
 
 LDLIBS  = -lsecp256k1-vrf

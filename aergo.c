@@ -1136,17 +1136,17 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   return send_grpc_request(instance, "CommitTX", request, handle_transfer_response);
 }
 
-bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
+EXPORTED bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
   //if (!receipt) return false; -- do not ask for a txn receipt
   return aergo_transfer_bignum__int(instance, NULL, NULL, receipt, from_account, to_account, amount, len);
 }
 
-bool aergo_transfer_bignum_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
+EXPORTED bool aergo_transfer_bignum_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
   if (!cb) return false;
   return aergo_transfer_bignum__int(instance, cb, arg, NULL, from_account, to_account, amount, len);
 }
 
-bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const char *value){
+EXPORTED bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const char *value){
   char buf[16];
   int len;
 
@@ -1155,7 +1155,7 @@ bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_acc
   return aergo_transfer_bignum(instance, receipt, from_account, to_account, buf, len);
 }
 
-bool aergo_transfer_str_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, const char *value){
+EXPORTED bool aergo_transfer_str_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, const char *value){
   char buf[16];
   int len;
 
@@ -1164,7 +1164,7 @@ bool aergo_transfer_str_async(aergo *instance, transaction_receipt_cb cb, void *
   return aergo_transfer_bignum_async(instance, cb, arg, from_account, to_account, buf, len);
 }
 
-bool aergo_transfer(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, double value){
+EXPORTED bool aergo_transfer(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, double value){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str), "%f", value);
@@ -1172,7 +1172,7 @@ bool aergo_transfer(aergo *instance, transaction_receipt *receipt, aergo_account
   return aergo_transfer_str(instance, receipt, from_account, to_account, amount_str);
 }
 
-bool aergo_transfer_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, double value){
+EXPORTED bool aergo_transfer_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, double value){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str), "%f", value);
@@ -1180,7 +1180,7 @@ bool aergo_transfer_async(aergo *instance, transaction_receipt_cb cb, void *arg,
   return aergo_transfer_str_async(instance, cb, arg, from_account, to_account, amount_str);
 }
 
-bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, uint64_t integer, uint64_t decimal){
+EXPORTED bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, uint64_t integer, uint64_t decimal){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str),
@@ -1189,7 +1189,7 @@ bool aergo_transfer_int(aergo *instance, transaction_receipt *receipt, aergo_acc
   return aergo_transfer_str(instance, receipt, from_account, to_account, amount_str);
 }
 
-bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, uint64_t integer, uint64_t decimal){
+EXPORTED bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, uint64_t integer, uint64_t decimal){
   char amount_str[36];
 
   snprintf(amount_str, sizeof(amount_str),
@@ -1254,17 +1254,17 @@ loc_exit:
   return status;
 }
 
-bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *args){
+EXPORTED bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *args){
   if (!receipt) return false;
   return aergo_call_smart_contract__int(instance, NULL, NULL, receipt, account, contract_address, function, args);
 }
 
-bool aergo_call_smart_contract_json_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *contract_address, const char *function, const char *args){
+EXPORTED bool aergo_call_smart_contract_json_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *contract_address, const char *function, const char *args){
   if (!cb) return false;
   return aergo_call_smart_contract__int(instance, cb, arg, NULL, account, contract_address, function, args);
 }
 
-bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *types, ...){
+EXPORTED bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *types, ...){
   uint8_t args[512];
   va_list ap;
   bool ret;
@@ -1277,7 +1277,7 @@ bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, ae
   return aergo_call_smart_contract_json(instance, receipt, account, contract_address, function, args);
 }
 
-bool aergo_call_smart_contract_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *contract_address, const char *function, const char *types, ...){
+EXPORTED bool aergo_call_smart_contract_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *contract_address, const char *function, const char *types, ...){
   uint8_t args[512];
   va_list ap;
   bool ret;
@@ -1336,17 +1336,17 @@ loc_exit:
   return status;
 }
 
-bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *args){
+EXPORTED bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *args){
   if (!result || resultlen <= 0) return false;
   return aergo_query_smart_contract__int(instance, NULL, NULL, result, resultlen, contract_address, function, args);
 }
 
-bool aergo_query_smart_contract_json_async(aergo *instance, query_smart_contract_cb cb, void *arg, const char *contract_address, const char *function, const char *args){
+EXPORTED bool aergo_query_smart_contract_json_async(aergo *instance, query_smart_contract_cb cb, void *arg, const char *contract_address, const char *function, const char *args){
   if (!cb) return false;
   return aergo_query_smart_contract__int(instance, cb, arg, NULL, 0, contract_address, function, args);
 }
 
-bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *types, ...){
+EXPORTED bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *types, ...){
   uint8_t args[512], *pargs;
   va_list ap;
   bool ret;
@@ -1364,7 +1364,7 @@ bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, co
   return aergo_query_smart_contract_json(instance, result, resultlen, contract_address, function, pargs);
 }
 
-bool aergo_query_smart_contract_async(aergo *instance, query_smart_contract_cb cb, void *arg, const char *contract_address, const char *function, const char *types, ...){
+EXPORTED bool aergo_query_smart_contract_async(aergo *instance, query_smart_contract_cb cb, void *arg, const char *contract_address, const char *function, const char *types, ...){
   uint8_t args[512], *pargs;
   va_list ap;
   bool ret;
@@ -1384,7 +1384,7 @@ bool aergo_query_smart_contract_async(aergo *instance, query_smart_contract_cb c
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool aergo_contract_events_subscribe(aergo *instance, const char *contract_address, const char *event_name, contract_event_cb cb, void *arg){
+EXPORTED bool aergo_contract_events_subscribe(aergo *instance, const char *contract_address, const char *event_name, contract_event_cb cb, void *arg){
   uint8_t buffer[256];
   size_t size;
   struct request *request = NULL;
@@ -1455,12 +1455,12 @@ static bool aergo_get_receipt__int(aergo *instance, const char *txn_hash, transa
   return send_grpc_request(instance, "GetReceipt", request, handle_receipt_response);
 }
 
-bool aergo_get_receipt(aergo *instance, const char *txn_hash, struct transaction_receipt *receipt){
+EXPORTED bool aergo_get_receipt(aergo *instance, const char *txn_hash, struct transaction_receipt *receipt){
   if (!receipt) return false;
   return aergo_get_receipt__int(instance, txn_hash, NULL, NULL, receipt, false);
 }
 
-bool aergo_get_receipt_async(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg){
+EXPORTED bool aergo_get_receipt_async(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg){
   if (!cb) return false;
   return aergo_get_receipt__int(instance, txn_hash, cb, arg, NULL, false);
 }
@@ -1491,12 +1491,12 @@ static bool aergo_get_block__int(aergo *instance, uint64_t blockNo){
   return send_grpc_request(instance, "GetBlockMetadata", request, handle_block_response);
 }
 
-bool aergo_get_block(aergo *instance, uint64_t blockNo){
+EXPORTED bool aergo_get_block(aergo *instance, uint64_t blockNo){
 
 
 }
 
-bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
+EXPORTED bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
 
 
 }
@@ -1506,7 +1506,7 @@ bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
-bool aergo_block_stream_subscribe(aergo *instance){
+EXPORTED bool aergo_block_stream_subscribe(aergo *instance){
   uint8_t buffer[32];
   size_t size;
   struct request *request = NULL;
@@ -1532,7 +1532,7 @@ bool aergo_block_stream_subscribe(aergo *instance){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool aergo_get_blockchain_status(aergo *instance){
+EXPORTED bool aergo_get_blockchain_status(aergo *instance){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
@@ -1555,12 +1555,12 @@ bool aergo_get_blockchain_status(aergo *instance){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool aergo_check_privkey(aergo *instance, aergo_account *account){
+EXPORTED bool aergo_check_privkey(aergo *instance, aergo_account *account){
   if (!instance || !account) return false;
   return secp256k1_ec_seckey_verify(instance->ecdsa, account->privkey);
 }
 
-bool aergo_get_account_state(aergo *instance, aergo_account *account){
+EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
@@ -1604,7 +1604,7 @@ bool aergo_get_account_state(aergo *instance, aergo_account *account){
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-aergo * aergo_connect(const char *host, int port) {
+EXPORTED aergo * aergo_connect(const char *host, int port) {
   aergo *instance;
 
 #ifdef _WIN32
@@ -1627,7 +1627,7 @@ aergo * aergo_connect(const char *host, int port) {
   return instance;
 }
 
-void aergo_free(aergo *instance) {
+EXPORTED void aergo_free(aergo *instance) {
   if (instance) {
     if (instance->ecdsa) secp256k1_context_destroy(instance->ecdsa);
     while (instance->requests) free_request(instance, instance->requests);
