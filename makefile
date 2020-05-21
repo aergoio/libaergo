@@ -123,6 +123,9 @@ install:
 	cd $(LIBPATH) && ln -sf $(LIBRARY) $(LIBNICK)
 	cp aergo.h $(INCPATH)
 	cp aergo.hpp $(INCPATH)
+ifeq ($(TARGET_OS),Linux)
+	ldconfig
+endif
 
 clean:
 	rm -f *.o *.a $(LIBNICK) $(LIBRARY)
