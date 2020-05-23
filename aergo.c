@@ -455,7 +455,7 @@ bool handle_query_error(aergo *instance, struct request *request) {
     ((char*)request->return_ptr)[size] = 0;
   }
 
-  return true;
+  return false;  /* confirms that it was a failure */
 }
 
 bool handle_query_response(aergo *instance, struct request *request) {

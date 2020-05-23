@@ -250,9 +250,11 @@ loc_again:
           request->error_msg = "connection or allocation error";
         }
         if (!request->response_ok && request->process_error) {
-          request->process_error(instance, request);
+          /* it uses the return value here because the error handler
+          ** can retry the request. this is used for receipts */
+          bool success = request->process_error(instance, request);
           if (request == main_request && psuccess) {
-            *psuccess = false;
+            *psuccess = success;
           }
         }
         /* close the socket */
