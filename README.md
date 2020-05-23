@@ -69,8 +69,8 @@ On some languages you can also include the static library in your project instea
 
 ## API
 
-* [documentation](https://github.com/aergoio/libaergo/wiki/en---Documentation---C)
-* [exported functions](https://github.com/aergoio/herac/blob/master/aergo.h)
+* [Documentation](https://github.com/aergoio/libaergo/wiki)
+* [Exported functions](https://github.com/aergoio/herac/blob/master/aergo.h)
 * [C++ class header](https://github.com/aergoio/herac/blob/master/aergo.hpp)
 
 
