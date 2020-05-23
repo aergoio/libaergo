@@ -2,9 +2,9 @@
 
 bool arrived = false;
 
-void on_smart_contract_result(void *arg, char *result, int len){
+void on_smart_contract_result(void *arg, bool success, char *result){
   std::cout << "------------------------------------\n";
-  std::cout << "Smart Contract Query OK\n";
+  std::cout << "Smart Contract Query " << (success ? "OK" : "FAILED") << "\n";
   std::cout << "Response: " << result << "\n";
   std::cout << "------------------------------------\n";
   arrived = true;

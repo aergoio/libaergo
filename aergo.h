@@ -187,7 +187,7 @@ bool aergo_query_smart_contract(aergo *instance,
 
 // Query smart contract - asynchronous
 
-typedef void (*query_smart_contract_cb)(void *arg, char *result, int len);
+typedef void (*query_smart_contract_cb)(void *arg, bool success, char *result);
 
 bool aergo_query_smart_contract_json_async(aergo *instance,
   query_smart_contract_cb cb,

@@ -4,9 +4,9 @@
 
 bool arrived = false;
 
-void on_smart_contract_result(void *arg, char *result, int len){
+void on_smart_contract_result(void *arg, bool success, char *result){
   puts  ("------------------------------------");
-  puts  ("Smart Contract Query OK");
+  printf("Smart Contract Query %s\n", success ? "OK" : "FAILED");
   printf("Response: %s\n", result);
   puts  ("------------------------------------");
   arrived = true;
@@ -26,7 +26,7 @@ int main() {
   bool ret = aergo_query_smart_contract_async(
     instance,
     on_smart_contract_result, NULL,
-    "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7",
+    "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW8",
     "hello", NULL
   );
 

@@ -14,21 +14,17 @@ int main() {
 
   puts("Connected. Sending request...");
 
-  bool ret = aergo_query_smart_contract(
+  bool success = aergo_query_smart_contract(
     instance,
     response, sizeof response,
     "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7",
     "hello", NULL
   );
 
-  if (ret == true) {
-    puts  ("------------------------------------");
-    puts  ("Smart Contract Query OK");
-    printf("Response: %s\n", response);
-    puts  ("------------------------------------");
-  } else {
-    puts  ("FAILED when querying the smart contract");
-  }
+  puts  ("------------------------------------");
+  printf("Smart Contract Query %s\n", success ? "OK" : "FAILED");
+  printf("Response: %s\n", response);
+  puts  ("------------------------------------");
 
   aergo_free(instance);
   puts("Disconnected");

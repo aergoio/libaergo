@@ -133,7 +133,7 @@ static bool http_strip_header(aergo *instance, request *request){
   if (!request->response || request->received <= 0) return false;
 
   ptr = strstr(request->response, "\r\n\r\n");
-  if (!ptr) return false;
+  if (!ptr) goto loc_invalid_response;
 
 #ifdef DEBUG_MESSAGES
   *ptr = 0;
@@ -145,11 +145,8 @@ static bool http_strip_header(aergo *instance, request *request){
     error_msg += strlen("Grpc-Message: ");
     ptr = strstr(error_msg, "\r\n");
     if (ptr) *ptr = 0;
-    DEBUG_PRINTF("  error: %s\n", error_msg);
-    if (instance->error_handler) {
-      instance->error_handler(instance->error_handler_arg, error_msg);
-    }
-    return false;
+    request->error_msg = error_msg;
+    goto loc_error;
   }
 
   header_size = ptr - request->response;
@@ -157,14 +154,7 @@ static bool http_strip_header(aergo *instance, request *request){
 
   /* removes the additional data sent before the content */
   ptr = strstr(ptr, "\r\n");
-  if (!ptr) {
-    DEBUG_PRINTLN("returned content in unexpected format");
-    if (instance->error_handler) {
-      instance->error_handler(instance->error_handler_arg,
-            "returned content in unexpected format");
-    }
-    return false;
-  }
+  if (!ptr) goto loc_invalid_response;
   ptr += 2;
 
   /* gets the size of the first data stream */
@@ -179,6 +169,20 @@ static bool http_strip_header(aergo *instance, request *request){
   DEBUG_PRINTF("  data   = %d bytes\n", data_size);
 
   return true;
+
+loc_invalid_response:
+
+  request->error_msg = "the server response is in unexpected format";
+
+loc_error:
+
+  DEBUG_PRINTF("\n  ERROR: %s\n\n", request->error_msg);
+
+  if (instance->error_handler) {
+    instance->error_handler(instance->error_handler_arg, request->error_msg);
+  }
+
+  return false;
 }
 
 
@@ -242,10 +246,13 @@ loc_again:
       }
       if (ret < 0) {
         request->processed = true;
+        if (!request->error_msg) {
+          request->error_msg = "connection or allocation error";
+        }
         if (!request->response_ok && request->process_error) {
-          bool success = request->process_error(instance, request);
+          request->process_error(instance, request);
           if (request == main_request && psuccess) {
-            *psuccess = success;
+            *psuccess = false;
           }
         }
         /* close the socket */

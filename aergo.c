@@ -439,6 +439,25 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   return false;
 }
 
+bool handle_query_error(aergo *instance, struct request *request) {
+
+  DEBUG_PRINTF("handle_query_error - %s\n", request->error_msg);
+
+  if (request->callback) {
+    query_smart_contract_cb callback = (query_smart_contract_cb) request->callback;
+    callback(request->arg, false, request->error_msg);
+  } else {
+    int size = strlen(request->error_msg);
+    if (size > request->return_size) {
+      size = request->return_size - 1;
+    }
+    memcpy(request->return_ptr, request->error_msg, size);
+    ((char*)request->return_ptr)[size] = 0;
+  }
+
+  return true;
+}
+
 bool handle_query_response(aergo *instance, struct request *request) {
   char *data = request->response;
   int len = request->received;
@@ -470,7 +489,7 @@ bool handle_query_response(aergo *instance, struct request *request) {
 
   if (request->callback) {
     query_smart_contract_cb callback = (query_smart_contract_cb) request->callback;
-    callback(request->arg, request->return_ptr, request->return_size);
+    callback(request->arg, true, request->return_ptr);
     free(request->return_ptr);
     request->return_ptr = NULL;
   }
@@ -1305,6 +1324,8 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
 
   if (!instance || !contract_address || !function) return false;
 
+  if (result) result[0] = 0;
+
   size = strlen(function) + strlen2(args);
   query_info = malloc(size + 32);
   buffer = malloc(size + 300);
@@ -1330,6 +1351,8 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
   request->arg = arg;
   request->return_ptr = result;
   request->return_size = resultlen;
+
+  request->process_error = handle_query_error;
 
   status = send_grpc_request(instance, "QueryContract", request, handle_query_response);
 

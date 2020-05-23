@@ -54,6 +54,7 @@ struct request {
   int received;
   bool processed;
   bool response_ok;
+  char *error_msg;
   bool keep_active;
 };
 
