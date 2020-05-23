@@ -225,9 +225,11 @@ bool encode_account_address(pb_ostream_t *stream, const pb_field_t *field, void 
 
     if (strlen(str) != EncodedAddressLength) {
       DEBUG_PRINTF("Lenght of address is invalid: %zu. It should be %d\n", strlen(str), EncodedAddressLength);
+      return false;
     }
 
     res = decode_address(str, strlen(str), decoded, sizeof(decoded));
+    if (!res) return false;
 
     if (!pb_encode_tag_for_field(stream, field))
         return false;
