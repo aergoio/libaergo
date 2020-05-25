@@ -2,6 +2,11 @@
 #include <stdbool.h>
 
 
+// Library version in string format
+
+char * aergo_lib_version();
+
+
 // Connection
 
 typedef struct aergo aergo;
