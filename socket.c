@@ -309,7 +309,7 @@ bool send_grpc_request(aergo *instance, char *service, struct request *request, 
     "POST /types.AergoRPCService/%s HTTP/1.1\r\n"
     "Host: %s:%d\r\n"
     "Connection: Close\r\n"
-    "User-Agent: herac/1.0\r\n"
+    "User-Agent: libaergo/0.1\r\n"
     "Accept: */*\r\n"
     "Content-Type: application/grpc-web+proto\r\n"
     "X-Grpc-Web: 1\r\n"
