@@ -1442,14 +1442,17 @@ static bool on_failed_receipt(aergo *instance, struct request *request) {
 
   DEBUG_PRINTLN("on_failed_receipt");
 
-  /* request a new transaction receipt */
-  return aergo_get_receipt__int(instance,
+  if (strstr(request->error_msg, "tx not found")) {
+    /* request a new transaction receipt */
+    return aergo_get_receipt__int(instance,
            request->txn_hash,
            request->callback,
            request->arg,
            (transaction_receipt *) request->return_ptr,
            true);
+  }
 
+  return false;
 }
 
 static bool aergo_get_receipt__int(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, bool retry_on_failure){
