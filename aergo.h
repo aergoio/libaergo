@@ -45,8 +45,8 @@ typedef struct transaction_receipt transaction_receipt;
 
 struct transaction_receipt {
   char contractAddress[56];  // in expanded/string form
-  char status[256];
-  char ret[256];
+  char status[16];
+  char ret[2048];
   uint64_t blockNo;
   char blockHash[32];
   int32_t txIndex;
