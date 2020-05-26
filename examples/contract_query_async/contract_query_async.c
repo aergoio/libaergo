@@ -26,7 +26,7 @@ int main() {
   bool ret = aergo_query_smart_contract_async(
     instance,
     on_smart_contract_result, NULL,
-    "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW8",
+    "AmhcceopRiU7r3Gwy5tmtkk4Z3Px53SfsKBifGMvaSSNiyWrvKYe",
     "hello", NULL
   );
 

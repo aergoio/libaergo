@@ -17,7 +17,7 @@ int main() {
   bool success = aergo_query_smart_contract(
     instance,
     response, sizeof response,
-    "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7",
+    "AmhcceopRiU7r3Gwy5tmtkk4Z3Px53SfsKBifGMvaSSNiyWrvKYe",
     "hello", NULL
   );
 

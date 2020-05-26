@@ -70,7 +70,7 @@ int main() {
   bool ret = aergo_call_smart_contract_async(instance,
       on_smart_contract_result, NULL,
       &account,
-      "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7",
+      "AmhcceopRiU7r3Gwy5tmtkk4Z3Px53SfsKBifGMvaSSNiyWrvKYe",
       "set_name", "s", str);
 
   if (ret == true) {

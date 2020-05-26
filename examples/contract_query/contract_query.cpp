@@ -8,7 +8,7 @@ int main() {
 
   bool success = aergo.query_smart_contract(
     response, sizeof response,
-    "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7",
+    "AmhcceopRiU7r3Gwy5tmtkk4Z3Px53SfsKBifGMvaSSNiyWrvKYe",
     "hello"
   );
 

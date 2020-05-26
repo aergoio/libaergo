@@ -22,7 +22,7 @@ int main() {
   std::cout << "Sending request...\n";
 
   bool ret = aergo.contract_events_subscribe(
-    "AmgMhLWDzwL2Goet6k4vxKniZksuEt3Dy8ULmiyDPpSmgJ5CgGZ4",
+    "AmhcceopRiU7r3Gwy5tmtkk4Z3Px53SfsKBifGMvaSSNiyWrvKYe",
     "",
     on_contract_event, NULL);
 
