@@ -2,9 +2,14 @@
 
 # libaergo
 
-This library is used to interface with the Aergo blockchains
-from C, C++, C# and VB.NET. Other languages can also use it
-via FFI.
+This library is used to interface with the Aergo blockchains from different programming languages:
+
+* C
+* C++
+* C#
+* VB.NET
+
+Other languages can also use it via FFI.
 
 
 ## Supported OS
