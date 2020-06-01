@@ -3,7 +3,8 @@
 # libaergo
 
 This library is used to interface with the Aergo blockchains
-from C, C++ and even other languages.
+from C, C++, C# and VB.NET. Other languages can also use it
+via FFI.
 
 
 ## Supported OS
@@ -92,3 +93,7 @@ gcc examples/contract_call/contract_call.c -laergo -o contract_call
 ```
 g++ examples/contract_call/contract_call.cpp -std=c++17 -laergo -o contract_call
 ```
+
+### C# and VB.NET
+
+Open the example in a new project, include the [.NET wrapper](https://github.com/aergoio/libaergo/blob/master/wrappers/dotNet/AergoClient.cs) in the project, then build and execute it.
