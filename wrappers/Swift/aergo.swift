@@ -306,6 +306,17 @@ class Aergo {
 
 
 
+  func check_private_key(account: AergoAccount) -> Bool {
+
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: account, c_account: &c_account)
+
+    return aergo_check_privkey(instance, &c_account)
+
+  }
+
+
   func get_account_state(account: AergoAccount) -> Bool {
 
     var c_account = aergo_account()
@@ -413,6 +424,8 @@ class Aergo {
 
 
 
+  // Synchronous Transfer - amount as Double
+
   func transfer(from_account: AergoAccount, to_account: String, amount: Double) -> TransactionReceipt {
 
     var ret: Bool
@@ -439,6 +452,67 @@ class Aergo {
     return receipt
   }
 
+
+  // Synchronous Transfer - amount as String
+
+  func transfer(from_account: AergoAccount, to_account: String, amount: String) -> TransactionReceipt {
+
+    var ret: Bool
+    let receipt = TransactionReceipt()
+    var c_receipt = transaction_receipt()
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: from_account, c_account: &c_account)
+
+    ret = aergo_transfer_str(
+      instance,
+      &c_receipt,
+      &c_account,
+      to_account,
+      amount
+    )
+
+    Aergo.update_account(account: from_account, c_account: &c_account)
+
+    if (ret == true) {
+      Aergo.update_receipt(receipt: receipt, c_receipt: &c_receipt)
+    }
+
+    return receipt
+  }
+
+
+  // Synchronous Transfer - amount as integer and decimal parts
+
+  func transfer(from_account: AergoAccount, to_account: String,
+                integer_part: UInt64, decimal_part: UInt64) -> TransactionReceipt {
+
+    var ret: Bool
+    let receipt = TransactionReceipt()
+    var c_receipt = transaction_receipt()
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: from_account, c_account: &c_account)
+
+    ret = aergo_transfer_int(
+      instance,
+      &c_receipt,
+      &c_account,
+      to_account,
+      integer_part, decimal_part
+    )
+
+    Aergo.update_account(account: from_account, c_account: &c_account)
+
+    if (ret == true) {
+      Aergo.update_receipt(receipt: receipt, c_receipt: &c_receipt)
+    }
+
+    return receipt
+  }
+
+
+  // Asynchronous Transfer - amount as Double
 
   func transfer_async(from_account: AergoAccount, to_account: String, amount: Double,
                       callback: @escaping (Any?,TransactionReceipt)->(),
@@ -470,6 +544,76 @@ class Aergo {
 
     return ret
   }
+
+
+  // Asynchronous Transfer - amount as String
+
+  func transfer_async(from_account: AergoAccount, to_account: String, amount: String,
+                      callback: @escaping (Any?,TransactionReceipt)->(),
+                      context: Any? = nil) -> Bool {
+
+    var ret: Bool
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: from_account, c_account: &c_account)
+
+    let callback_info = TransactionCallbackInfo(cb: callback, ctx: context)
+    let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(callback_info).toOpaque())
+
+    ret = aergo_transfer_str_async(
+      instance,
+      on_receipt_internal_callback,
+      ctx,
+      &c_account,
+      to_account,
+      amount
+    )
+
+    Aergo.update_account(account: from_account, c_account: &c_account)
+
+    if (ret == false) {
+      // unretain the object
+      _ = Unmanaged<TransactionCallbackInfo>.fromOpaque(ctx).takeRetainedValue()
+    }
+
+    return ret
+  }
+
+
+  // Asynchronous Transfer - amount as integer and decimal parts
+
+  func transfer_async(from_account: AergoAccount, to_account: String,
+                      integer_part: UInt64, decimal_part: UInt64,
+                      callback: @escaping (Any?,TransactionReceipt)->(),
+                      context: Any? = nil) -> Bool {
+
+    var ret: Bool
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: from_account, c_account: &c_account)
+
+    let callback_info = TransactionCallbackInfo(cb: callback, ctx: context)
+    let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(callback_info).toOpaque())
+
+    ret = aergo_transfer_int_async(
+      instance,
+      on_receipt_internal_callback,
+      ctx,
+      &c_account,
+      to_account,
+      integer_part, decimal_part
+    )
+
+    Aergo.update_account(account: from_account, c_account: &c_account)
+
+    if (ret == false) {
+      // unretain the object
+      _ = Unmanaged<TransactionCallbackInfo>.fromOpaque(ctx).takeRetainedValue()
+    }
+
+    return ret
+  }
+
 
 
   func contract_events_subscribe(contractAddress: String, eventName: String,
