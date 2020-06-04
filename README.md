@@ -8,6 +8,7 @@ This library is used to interface with the Aergo blockchains from different prog
 * C++
 * C#
 * VB.NET
+* Swift
 
 Other languages can also use it via FFI.
 
@@ -101,4 +102,24 @@ g++ examples/contract_call/contract_call.cpp -std=c++17 -laergo -o contract_call
 
 ### C# and VB.NET
 
-Open the example in a new project, include the [.NET wrapper](https://github.com/aergoio/libaergo/blob/master/wrappers/dotNet/AergoClient.cs) in the project, then build and execute it.
+Open the example in a new project, include the [.NET wrapper](https://github.com/aergoio/libaergo/blob/master/wrappers/dotNet/AergoClient.cs)
+in the project, then build and execute it.
+
+Or compile it via command line: (Windows)
+
+```
+PATH=c:\Windows\Microsoft.NET\Framework\v4.0.30319;%PATH%
+csc examples\contract_query\contract_query.cs wrappers\dotNet\AergoClient.cs /r:System.Numerics.dll
+```
+
+### Swift
+
+Open the example in a new project, include the [Swift wrapper](https://github.com/aergoio/libaergo/blob/master/wrappers/Swift/aergo.swift)
+and the [bridging header](https://github.com/aergoio/libaergo/blob/master/wrappers/Swift/libaergo-Bridging-Header.h)
+on the project, then build and execute it.
+
+Or compile it via command line:
+
+```
+swiftc examples/contract_query/main.swift wrappers/Swift/aergo.swift -import-objc-header wrappers/Swift/libaergo-Bridging-Header.h -L/usr/local/lib -laergo
+```
