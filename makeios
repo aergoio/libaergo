@@ -90,4 +90,6 @@ mv libaergo.a $pwd/ios/
 mv libaergo.dylib $pwd/ios/
 make clean
 
-echo "done."
+echo ""
+echo "done. files in the ios folder"
+echo ""
