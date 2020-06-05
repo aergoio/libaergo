@@ -10,8 +10,6 @@ unsigned char privkey[32] = {
   0x61, 0x76
 };
 
-bool arrived = false;
-
 void on_smart_contract_result(void *arg, transaction_receipt *receipt){
   puts  ("------------------------------------");
   puts  ("Smart Contract Call Receipt:");
@@ -22,7 +20,6 @@ void on_smart_contract_result(void *arg, transaction_receipt *receipt){
   printf("gasUsed: %llu\n", receipt->gasUsed);
   printf("feeUsed: %f\n", receipt->feeUsed);
   puts  ("------------------------------------");
-  arrived = true;
 }
 
 int main() {
@@ -75,12 +72,11 @@ int main() {
 
   if (ret == true) {
     puts("done. waiting for response...");
-    while (!arrived) {
+    while (aergo_process_requests(instance, 5000) > 0) {
       /*
       ** instead of a loop, your application can put this call
       ** on a timer callback and use timeout = 0
       */
-      aergo_process_requests(instance, 5000);
     }
   } else {
     puts("failed sending transaction");

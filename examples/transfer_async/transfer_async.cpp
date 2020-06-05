@@ -8,8 +8,6 @@ unsigned char privkey[32] = {
   0x61, 0x76
 };
 
-bool arrived = false;
-
 void on_transfer_result(void *arg, transaction_receipt *receipt){
   std::cout << "------------------------------------\n";
   std::cout << "done.\n";
@@ -21,7 +19,6 @@ void on_transfer_result(void *arg, transaction_receipt *receipt){
   std::cout << "gasUsed: " << receipt->gasUsed << "\n";
   std::cout << "feeUsed: " << receipt->feeUsed << "\n";
   std::cout << "------------------------------------\n";
-  arrived = true;
 }
 
 int main() {
@@ -53,12 +50,11 @@ int main() {
 
   if (ret == true) {
     std::cout << "done. waiting for response...\n";
-    while (!arrived) {
+    while (aergo.process_requests(5000) > 0) {
       /*
       ** instead of a loop, your application can put this call
       ** on a timer callback and use timeout = 0
       */
-      aergo.process_requests(5000);
     }
   } else {
     std::cout << "transfer FAILED\n";

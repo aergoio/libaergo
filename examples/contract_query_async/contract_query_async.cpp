@@ -1,13 +1,10 @@
 #include "aergo.hpp"
 
-bool arrived = false;
-
 void on_smart_contract_result(void *arg, bool success, char *result){
   std::cout << "------------------------------------\n";
   std::cout << "Smart Contract Query " << (success ? "OK" : "FAILED") << "\n";
   std::cout << "Response: " << result << "\n";
   std::cout << "------------------------------------\n";
-  arrived = true;
 }
 
 int main() {
@@ -21,12 +18,11 @@ int main() {
 
   if (ret == true) {
     std::cout << "done. waiting for response...\n";
-    while (!arrived) {
+    while (aergo.process_requests(5000) > 0) {
       /*
       ** instead of a loop, your application can put this call
       ** on a timer callback and use timeout = 0
       */
-      aergo.process_requests(5000);
     }
   } else {
     std::cout << "FAILED querying the smart contract\n";

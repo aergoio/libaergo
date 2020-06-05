@@ -2,14 +2,11 @@
 #include <stdlib.h>
 #include "aergo.h"
 
-bool arrived = false;
-
 void on_smart_contract_result(void *arg, bool success, char *result){
   puts  ("------------------------------------");
   printf("Smart Contract Query %s\n", success ? "OK" : "FAILED");
   printf("Response: %s\n", result);
   puts  ("------------------------------------");
-  arrived = true;
 }
 
 int main() {
@@ -32,12 +29,11 @@ int main() {
 
   if (ret == true) {
     puts("done. waiting for response...");
-    while (!arrived) {
+    while (aergo_process_requests(instance, 5000) > 0) {
       /*
       ** instead of a loop, your application can put this call
       ** on a timer callback and use timeout = 0
       */
-      aergo_process_requests(instance, 5000);
     }
   } else {
     puts  ("FAILED when querying the smart contract");
