@@ -22,14 +22,6 @@ Other languages can also use it via FFI.
 * Android
 
 
-## Compiling
-
-```
-make
-sudo make install
-```
-
-
 ## Dependencies
 
 On Linux:
@@ -57,6 +49,22 @@ sudo make install
 cd ..
 ```
 
+
+## Compiling
+
+```
+make
+sudo make install
+```
+
+For iOS:
+
+```
+cd ../secp256k1-vrf
+./makeios
+cd -
+./makeios
+```
 
 ## Usage
 

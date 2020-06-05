@@ -68,6 +68,8 @@ debug:  export CFLAGS :=  -g -DDEBUG_MESSAGES  $(CFLAGS)
 
 static: libaergo.a
 
+ios:    libaergo.dylib static
+
 
 
 aergo.o: account.c account.h aergo-int.h aergo.c aergo.h base58.c base58.h blockchain.pb.c blockchain.pb.h conversions.c endianess.c linked_list.c sha256.c socket.c mbedtls/bignum.c nanopb/pb_common.c nanopb/pb_encode.c nanopb/pb_decode.c
@@ -128,4 +130,4 @@ ifeq ($(TARGET_OS),Linux)
 endif
 
 clean:
-	rm -f *.o *.a $(LIBNICK) $(LIBRARY)
+	rm -f *.o libaergo.a $(LIBNICK) $(LIBRARY)
