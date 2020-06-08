@@ -18,8 +18,8 @@ else
 endif
 
 ifeq ($(TARGET_OS),Windows)
-	IMPLIB   := aergo-0.1
-	LIBRARY  := aergo-0.1.dll
+	IMPLIB   := libaergo-0.1
+	LIBRARY  := libaergo-0.1.dll
 	WINLIB   := $(IMPLIB).lib
 	CFLAGS   := $(CFLAGS) -DMBEDTLS_PLATFORM_C
 	LDFLAGS  := $(LDFLAGS) -static-libgcc -static-libstdc++
@@ -110,7 +110,7 @@ else
 endif
 
 # Windows
-aergo-0.1.dll: aergo.o
+libaergo-0.1.dll: aergo.o
 	$(CC) -shared  -o $@  $^  -Wl,--out-implib,$(IMPLIB).lib $(LDLIBS) $(LDFLAGS) -lws2_32
 ifeq ($(MAKECMDGOALS),valgrind)
 else ifeq ($(MAKECMDGOALS),debug)
@@ -130,4 +130,4 @@ ifeq ($(TARGET_OS),Linux)
 endif
 
 clean:
-	rm -f *.o libaergo.a $(LIBNICK) $(LIBRARY)
+	rm -f *.o libaergo.a $(LIBNICK) $(LIBRARY) $(WINLIB)
