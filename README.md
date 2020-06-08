@@ -22,7 +22,19 @@ Other languages can also use it via FFI.
 * Android
 
 
+## Pre-compiled binaries
+
+You can download binaries for iOS and Windows in the [releases](https://github.com/aergoio/libaergo/releases)
+
+
 ## Dependencies
+
+libaergo depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
+
+
+### Compiling the dependencies
+
+First install the tools required for compilation
 
 On Linux:
 
@@ -36,8 +48,7 @@ On Mac:
 brew install automake libtool
 ```
 
-It depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
-which can be installed with:
+Compiling and installing `secp256k1-vrf`:
 
 ```
 git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
@@ -50,7 +61,7 @@ cd ..
 ```
 
 
-## Compiling
+## Compiling libaergo
 
 ```
 make
