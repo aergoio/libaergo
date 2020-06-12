@@ -9,6 +9,7 @@ This library is used to interface with the Aergo blockchains from different prog
 * C#
 * VB.NET
 * Swift
+* Ruby
 
 Other languages can also use it via FFI.
 
@@ -141,4 +142,10 @@ Or compile it via command line:
 
 ```
 swiftc examples/contract_query/main.swift wrappers/Swift/aergo.swift -import-objc-header wrappers/Swift/libaergo-Bridging-Header.h -L/usr/local/lib -laergo
+```
+
+### Ruby
+
+```
+ruby examples/contract_call/contract_call.rb
 ```
