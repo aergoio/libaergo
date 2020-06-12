@@ -146,6 +146,14 @@ swiftc examples/contract_query/main.swift wrappers/Swift/aergo.swift -import-obj
 
 ### Ruby
 
+Install the ffi module:
+
+```
+[sudo] gem install ffi
+```
+
+To run an example:
+
 ```
 ruby examples/contract_call/contract_call.rb
 ```
