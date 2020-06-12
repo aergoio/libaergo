@@ -1,4 +1,4 @@
-require '../../wrappers/Ruby/aergo.rb'
+require_relative '../../wrappers/Ruby/aergo.rb'
 
 QueryCallback = Proc.new do |context, success, result|
     if success

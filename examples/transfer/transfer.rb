@@ -1,4 +1,4 @@
-require '../../wrappers/Ruby/aergo.rb'
+require_relative '../../wrappers/Ruby/aergo.rb'
 
 aergo = Aergo.new("testnet-api.aergo.io", 7845)
 
