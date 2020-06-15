@@ -33,10 +33,9 @@ bool decode_address(const char *encoded, size_t encsize, void *out, size_t outsi
   decsize = sizeof(decoded);
   if (b58tobin(decoded, &decsize, encoded, encsize) == false) return false;
 
-  res = b58check(out, decsize, encoded, encsize);
-  if (res == AddressVersion) return false;
+  res = b58check(decoded, decsize, encoded, encsize);
+  if (res != AddressVersion) return false;
 
   memcpy(out, &decoded[1], AddressLength);
   return true;
 }
-
