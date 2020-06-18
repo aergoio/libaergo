@@ -30,6 +30,8 @@ int aergo_process_requests(aergo *instance, int timeout);
 typedef struct aergo_account aergo_account;
 
 struct aergo_account {
+  bool use_ledger;
+  int  index;
   unsigned char privkey[32];
   unsigned char pubkey[33];
   char address[64];

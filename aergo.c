@@ -1584,6 +1584,8 @@ EXPORTED bool aergo_get_blockchain_status(aergo *instance){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "ledger.c"
+
 EXPORTED bool aergo_check_privkey(aergo *instance, aergo_account *account){
   if (!instance || !account) return false;
   return secp256k1_ec_seckey_verify(instance->ecdsa, account->privkey);
@@ -1599,15 +1601,21 @@ EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account){
   if (!instance || !account) return false;
 
   if (account->pubkey[0] == 0 && account->pubkey[1] == 0) {
-    /* calculate the public key */
-    secp256k1_pubkey pubkey;
-    int ret = secp256k1_ec_pubkey_create(instance->ecdsa, &pubkey, account->privkey);
-    if (ret) {
-      size_t pklen = 33;
-      ret = secp256k1_ec_pubkey_serialize(instance->ecdsa, account->pubkey,
-                                         &pklen, &pubkey, SECP256K1_EC_COMPRESSED);
+    if (account->use_ledger) {
+      if (ledger_get_account_public_key(account) == false) {
+        return false;
+      }
+    } else {
+      /* calculate the public key */
+      secp256k1_pubkey pubkey;
+      int ret = secp256k1_ec_pubkey_create(instance->ecdsa, &pubkey, account->privkey);
+      if (ret) {
+        size_t pklen = 33;
+        ret = secp256k1_ec_pubkey_serialize(instance->ecdsa, account->pubkey,
+                                          &pklen, &pubkey, SECP256K1_EC_COMPRESSED);
+      }
+      if (ret != 1) return false;
     }
-    if (ret != 1) return false;
   }
 
   account->is_updated = false;
