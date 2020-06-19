@@ -24,18 +24,29 @@ fn_ledger_send_apdu ledger_send_apdu = NULL;
 bool load_ledger_library(){
   char *zFile;
 
-#ifdef __APPLE__
-  zFile = "libaergo-ledger.dylib";
-#elif SQLITE_OS_UNIX
-  zFile = "libaergo-ledger.so";
-#elif SQLITE_OS_WIN
+#ifdef _WIN32
   zFile = "libaergo-ledger.dll";
+#elif __APPLE__
+  zFile = "libaergo-ledger.dylib";
+#else
+  zFile = "libaergo-ledger.so";
 #endif
 
   if (ledger_send_apdu == NULL) {
     void *h = dylib_open(zFile);
+    if (h == NULL) {
+      char errmsg[256];
+      dylib_error(sizeof errmsg, errmsg);
+      printf("failed to load the libaergo-ledger library: %s", errmsg);
+      return false;
+    }
     ledger_send_apdu = (fn_ledger_send_apdu) dylib_sym(h, "ledger_send_apdu");
-    if (ledger_send_apdu == NULL) return false;
+    if (ledger_send_apdu == NULL) {
+      char errmsg[256];
+      dylib_error(sizeof errmsg, errmsg);
+      printf("failed to read the libaergo-ledger library: %s", errmsg);
+      return false;
+    }
   }
 
   return true;
@@ -91,15 +102,15 @@ bool ledger_get_account_public_key(aergo_account *account){
   result = ledger_get_public_key(path, len, pubkey, sizeof pubkey, &sw);
 
   if (result == -1 && sw == -1) {
-    //fprintf(stderr, "No dongle found\n");
+    fprintf(stderr, "No dongle found or application not open\n");
     return false;
   }
   if (result < 0) {
-    //fprintf(stderr, "I/O error or library not found\n");
+    fprintf(stderr, "I/O error or library not found\n");
     return false;
   }
   if (sw != SW_OK) {
-    //fprintf(stderr, "Dongle application error : %.4x\n", sw);
+    fprintf(stderr, "Dongle application error : %.4x\n", sw);
     return false;
   }
 
