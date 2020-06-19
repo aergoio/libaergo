@@ -82,7 +82,7 @@ libaergo.a: aergo.o
 
 # Linux / Unix
 libaergo.so.0.1: aergo.o
-	$(CC) -shared -Wl,-soname,$(SONAME)  -o $@  $^  $(LDLIBS) $(LDFLAGS)
+	$(CC) -shared -Wl,-soname,$(SONAME)  -o $@  $^  $(LDLIBS) $(LDFLAGS) -ldl
 ifeq ($(MAKECMDGOALS),valgrind)
 else ifeq ($(MAKECMDGOALS),debug)
 else
