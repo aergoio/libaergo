@@ -271,6 +271,8 @@ class Aergo {
     memcpy(&c_account.pubkey, &account.pubkey, 33)
     memcpy(&c_account.state_root, &account.state_root, 32)
 
+    c_account.use_ledger = account.use_ledger
+    c_account.index = account.index
     c_account.balance = account.balance
     c_account.nonce = account.nonce
     c_account.is_updated = account.is_updated
@@ -285,6 +287,8 @@ class Aergo {
     memcpy(&account.pubkey, &c_account.pubkey, 33)
     memcpy(&account.state_root, &c_account.state_root, 32)
 
+    account.use_ledger = c_account.use_ledger
+    account.index = c_account.index
     account.balance = c_account.balance
     account.nonce = c_account.nonce
     account.is_updated = c_account.is_updated
