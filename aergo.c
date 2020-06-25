@@ -255,12 +255,11 @@ bool encode_blob(pb_ostream_t *stream, const pb_field_t *field, void * const *ar
 
     DEBUG_PRINTF("encode_blob arg=%p\n", blob);
 
-    if (!blob) return true;
+    if (!blob || blob->ptr == NULL || blob->size == 0) return true;
 
     if (!pb_encode_tag_for_field(stream, field))
         return false;
 
-    if (blob->ptr==0) return true;
     return pb_encode_string(stream, blob->ptr, blob->size);
 }
 
@@ -729,6 +728,54 @@ loc_failed:
   return false;
 }
 
+bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
+  struct txn *txn = *(struct txn **)arg;
+  TxBody txbody = TxBody_init_zero;
+
+  DEBUG_PRINTLN("encode_transaction_body");
+
+  if (!pb_encode_tag_for_field(stream, field))
+      return false;
+
+  txbody.type = (TxType) txn->type;
+  txbody.nonce = txn->nonce;
+
+  struct blob acc = { .ptr = txn->account, .size = AddressLength };
+  txbody.account.arg = &acc;
+  txbody.account.funcs.encode = encode_blob;
+
+  struct blob rec = { .ptr = txn->recipient, .size = AddressLength };
+  txbody.recipient.arg = &rec;
+  txbody.recipient.funcs.encode = encode_blob;
+
+  txbody.payload.arg = txn->payload;
+  txbody.payload.funcs.encode = &encode_string;
+
+  struct blob amt = { .ptr = txn->amount, .size = txn->amount_len };
+  txbody.amount.arg = &amt;
+  txbody.amount.funcs.encode = &encode_blob;
+
+  txbody.gasLimit = txn->gasLimit;
+
+  txbody.gasPrice.arg = &txn->gasPrice;
+  txbody.gasPrice.funcs.encode = &encode_varuint64;
+
+  struct blob cid = { .ptr = txn->chainIdHash, .size = 32 };
+  txbody.chainIdHash.arg = &cid;
+  txbody.chainIdHash.funcs.encode = &encode_blob;
+
+  struct blob sig = { .ptr = txn->sign, .size = txn->sig_len };
+  txbody.sign.arg = &sig;
+  txbody.sign.funcs.encode = &encode_blob;
+
+  /* Encode the message */
+  bool status = pb_encode_submessage(stream, TxBody_fields, &txbody);
+  if (!status) {
+    DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(stream));
+  }
+  return status;
+}
+
 bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
   struct txn *txn = *(struct txn **)arg;
   Tx message = Tx_init_zero;
@@ -745,41 +792,10 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   message.hash.arg = &bb;
   message.hash.funcs.encode = &encode_blob;
 
+  message.body.arg = txn;
+  message.body.funcs.encode = &encode_transaction_body;
 
-  /* Set the values and the encoder callback functions */
-  message.body.type = (TxType) txn->type;
-  message.body.nonce = txn->nonce;
-
-  struct blob acc = { .ptr = txn->account, .size = AddressLength };
-  message.body.account.arg = &acc;
-  message.body.account.funcs.encode = encode_blob;
-
-  struct blob rec = { .ptr = txn->recipient, .size = AddressLength };
-  message.body.recipient.arg = &rec;
-  message.body.recipient.funcs.encode = encode_blob;
-
-  message.body.payload.arg = txn->payload;
-  message.body.payload.funcs.encode = &encode_string;
-
-  struct blob amt = { .ptr = txn->amount, .size = txn->amount_len };
-  message.body.amount.arg = &amt;
-  message.body.amount.funcs.encode = &encode_blob;
-
-  message.body.gasLimit = txn->gasLimit;
-
-  message.body.gasPrice.arg = &txn->gasPrice;
-  message.body.gasPrice.funcs.encode = &encode_varuint64;
-
-  struct blob cid = { .ptr = txn->chainIdHash, .size = 32 };
-  message.body.chainIdHash.arg = &cid;
-  message.body.chainIdHash.funcs.encode = &encode_blob;
-
-  struct blob sig = { .ptr = txn->sign, .size = txn->sig_len };
-  message.body.sign.arg = &sig;
-  message.body.sign.funcs.encode = &encode_blob;
-
-
-  /* Decode the message */
+  /* Encode the message */
   bool status = pb_encode_submessage(stream, Tx_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(stream));

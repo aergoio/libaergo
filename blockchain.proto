@@ -46,7 +46,7 @@ enum TxType {
 
 message Tx {
   bytes hash = 1;
-  TxBody body = 2;
+  bytes body = 2;  // TxBody
 }
 
 message TxBody {
