@@ -11,19 +11,20 @@ unsigned char privkey[32] = {
 int main() {
   Aergo aergo("testnet-api.aergo.io", 7845);
   aergo_account account = {0};
+  char errmsg[256];
 
   /* load the private key in the account */
   std::memcpy(account.privkey, privkey, 32);
 
   /* get the account state (public key, address, balance, nonce...) */
-  if (aergo.get_account_state(&account) == true) {
+  if (aergo.get_account_state(&account, errmsg) == true) {
     std::cout << "------------------------------------\n";
     std::cout << "Account address: " << account.address << "\n";
     std::cout << "Account balance: " << account.balance << "\n";
     std::cout << "Account nonce:   " << account.nonce   << "\n";
     //std::cout << "Account state_root: " << account.state_root << "\n";
   } else {
-    std::cout << "FAILED to get the account state\n";
+    std::cout << "FAILED to get the account state: " << errmsg << "\n";
   }
 
   std::cout << "Disconnected\n";
