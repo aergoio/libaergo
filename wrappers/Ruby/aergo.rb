@@ -120,7 +120,13 @@ class Aergo
     end
 
     def get_account_state(account)
-        AergoAPI.aergo_get_account_state(@instance, account)
+        error_msg = FFI::MemoryPointer.new(:int8, 256)
+
+        ret = AergoAPI.aergo_get_account_state(@instance, account, error_msg)
+
+        error_msg = error_msg.read_string().force_encoding('UTF-8')
+
+        { "success" => ret, "error" => error_msg }
     end
 
 

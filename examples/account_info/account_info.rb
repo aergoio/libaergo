@@ -7,6 +7,10 @@ account[:privkey] = "\xCD\xFA\x3B\xF9\x1A\x2C\xB6\x9B\xEC\xB0\x16\x7E\x11\x00\xF
 
 ret = aergo.get_account_state(account)
 
-puts "address: " + account[:address]
-puts "nonce  : " + account[:nonce].to_s
-puts "balance: " + account[:balance].to_s
+if ret["success"]
+  puts "address: " + account[:address]
+  puts "nonce  : " + account[:nonce].to_s
+  puts "balance: " + account[:balance].to_s
+else
+  puts "FAILED: " + ret["error"]
+end
