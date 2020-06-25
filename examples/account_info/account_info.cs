@@ -24,15 +24,15 @@ namespace account_info_cs
 
                 Console.WriteLine("Sending request...");
 
-                var success = client.GetAccountInfo(ref account);
+                var ret = client.GetAccountInfo(ref account);
 
-                if (success) {
+                if (ret.success) {
                     Console.WriteLine("Account state:");
                     Console.WriteLine("Address = " + account.address);
                     Console.WriteLine("Balance = " + account.balance);
                     Console.WriteLine("Nonce   = " + account.nonce);
                 } else {
-                    Console.WriteLine("Failed");
+                    Console.WriteLine("Failed: " + ret.error);
                 }
 
             }

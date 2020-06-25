@@ -16,6 +16,12 @@ public class AergoClient : IDisposable
         public String  result;
     }
 
+    public class StateResult
+    {
+        public Boolean success;
+        public String  result;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct TransactionReceipt
     {
@@ -235,8 +241,10 @@ public class AergoClient : IDisposable
         return aergo_check_privkey(_Instance, account);
     }
 
-    public bool GetAccountInfo(ref AergoAccount account) {
-        return aergo_get_account_state(_Instance, ref account);
+    public StateResult GetAccountInfo(ref AergoAccount account) {
+        StringBuilder sb = new StringBuilder(256);
+        Boolean success = aergo_get_account_state(_Instance, ref account, sb);
+        return new StateResult { success = success, error = sb.ToString() };
     }
 
     // Contract Events

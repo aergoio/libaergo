@@ -12,15 +12,15 @@
                                          &H4E, &HE5, &HC, &H2C, &HD4, &HBA, &HDD, &H70, &H1, &HF0,
                                          &HC5, &H4B}}
 
-            Dim success = client.GetAccountInfo(account)
+            Dim ret = client.GetAccountInfo(account)
 
-            If success Then
+            If ret.success Then
                 Console.WriteLine("Account state:")
                 Console.WriteLine("Address = " + account.address)
                 Console.WriteLine("Balance = " + account.balance.ToString())
                 Console.WriteLine("Nonce   = " + account.nonce.ToString())
             Else
-                Console.WriteLine("Error on getting account state.")
+                Console.WriteLine("FAILED: " + ret.error)
             End If
 
         End Using
