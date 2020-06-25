@@ -59,6 +59,12 @@ public class AergoClient : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     public struct AergoAccount
     {
+        [MarshalAsAttribute(UnmanagedType.Bool)]
+        public bool use_ledger;
+
+        [MarshalAsAttribute(UnmanagedType.I4)]
+        public Int32 index;
+
         [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 32)]
         public byte[] privkey;
 

@@ -4,6 +4,8 @@ import Foundation
 // Public objects
 
 class AergoAccount {
+  var use_ledger: Bool
+  var index: Int32
   var privkey: [UInt8]
   var pubkey: [UInt8]
   var address: String
@@ -13,6 +15,8 @@ class AergoAccount {
   var is_updated: Bool
 
   init() {
+    use_ledger = false
+    index = 0
     privkey = [UInt8](repeating: 0, count: 32)
     pubkey = [UInt8](repeating: 0, count: 33)
     address = ""

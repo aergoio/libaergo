@@ -15,7 +15,9 @@ module AergoAPI
   # Accounts
 
   class Account < FFI::Struct
-    layout :privkey, [:uint8, 32],
+    layout :use_ledger, :bool,
+           :index, :int32,
+           :privkey, [:uint8, 32],
            :pubkey,  [:uint8, 33],
            :address, [:uint8, 64],
            :nonce,   :uint64,
@@ -25,7 +27,7 @@ module AergoAPI
   end
 
   attach_function 'aergo_check_privkey', [:pointer, Account.by_ref], :bool
-  attach_function 'aergo_get_account_state', [:pointer, Account.by_ref], :bool
+  attach_function 'aergo_get_account_state', [:pointer, Account.by_ref, :pointer], :bool
 
   # Transaction Receipt
 
@@ -97,7 +99,6 @@ class Aergo
     @instance = 0
 
     def initialize(host, port)
-        puts "initializing"
        @instance = AergoAPI.aergo_connect(host, port)
     end
 
