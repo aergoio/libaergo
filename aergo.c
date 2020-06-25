@@ -638,96 +638,6 @@ struct txn {
   unsigned char hash[32];       // hash of the whole transaction including the signature
 };
 
-bool encode_bigint(uint8_t **pptr, uint64_t value){
-
-  // TODO: encode the gasPrice
-
-  //len = xxx(txn->amount);
-  //memcpy(ptr, txn->amount, len); ptr += len;
-
-  // for now it is just including a single byte (zero)
-  // this should be removed:
-  memcpy(*pptr, &value, 1); (*pptr)++;
-
-  return true;
-}
-
-bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signature){
-  uint8_t buf[1024], *ptr;
-  size_t len = 0;
-
-  DEBUG_PRINTLN("calculate_tx_hash");
-
-  ptr = buf;
-
-  memcpy(ptr, &txn->nonce, 8); ptr += 8;
-
-  memcpy(ptr, txn->account, AddressLength); ptr += AddressLength;
-
-  //if (txn->recipient){
-    memcpy(ptr, txn->recipient, AddressLength); ptr += AddressLength;
-  //}
-
-  // it must be at least 1 byte in size!
-  memcpy(ptr, txn->amount, txn->amount_len); ptr += txn->amount_len;
-
-  if (txn->payload){
-    len = strlen(txn->payload);
-    memcpy(ptr, txn->payload, len); ptr += len;
-  }
-
-  memcpy(ptr, &txn->gasLimit, 8); ptr += 8;
-
-  encode_bigint(&ptr, txn->gasPrice);
-
-  memcpy(ptr, &txn->type, 4); ptr += 4;
-
-  memcpy(ptr, txn->chainIdHash, 32); ptr += 32;
-
-  if (include_signature) {
-    memcpy(ptr, txn->sign, txn->sig_len); ptr += txn->sig_len;
-  }
-
-  len = ptr - buf;
-  sha256(hash, buf, len);
-
-  return true;
-}
-
-bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
-  secp256k1_ecdsa_signature sig;
-  uint8_t hash[32];
-  bool ret;
-
-  DEBUG_PRINTLN("sign_transaction");
-
-  calculate_tx_hash(txn, hash, false);
-
-  DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
-
-  /* sign the message hash */
-
-  ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
-  if (ret == false) goto loc_failed;
-
-#if 0
-  ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
-  if (ret == false) goto loc_failed;
-
-  txn->sig_len = 64;  /* size of the compact signature format */
-#endif
-
-  txn->sig_len = sizeof(txn->sign);
-  ret = secp256k1_ecdsa_signature_serialize_der(instance->ecdsa, txn->sign, &txn->sig_len, &sig);
-  if (ret == false) goto loc_failed;
-
-  DEBUG_PRINT_BUFFER("signature", txn->sign, txn->sig_len);
-  return true;
-loc_failed:
-  DEBUG_PRINTF("write_signature FAILED: %d\n", ret);
-  return false;
-}
-
 bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
   struct txn *txn = *(struct txn **)arg;
   TxBody txbody = TxBody_init_zero;
@@ -833,6 +743,98 @@ bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct t
 
   *psize = size;
   return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool encode_bigint(uint8_t **pptr, uint64_t value){
+
+  // TODO: encode the gasPrice
+
+  //len = xxx(txn->amount);
+  //memcpy(ptr, txn->amount, len); ptr += len;
+
+  // for now it is just including a single byte (zero)
+  // this should be removed:
+  memcpy(*pptr, &value, 1); (*pptr)++;
+
+  return true;
+}
+
+bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signature){
+  uint8_t buf[1024], *ptr;
+  size_t len = 0;
+
+  DEBUG_PRINTLN("calculate_tx_hash");
+
+  ptr = buf;
+
+  memcpy(ptr, &txn->nonce, 8); ptr += 8;
+
+  memcpy(ptr, txn->account, AddressLength); ptr += AddressLength;
+
+  //if (txn->recipient){
+    memcpy(ptr, txn->recipient, AddressLength); ptr += AddressLength;
+  //}
+
+  // it must be at least 1 byte in size!
+  memcpy(ptr, txn->amount, txn->amount_len); ptr += txn->amount_len;
+
+  if (txn->payload){
+    len = strlen(txn->payload);
+    memcpy(ptr, txn->payload, len); ptr += len;
+  }
+
+  memcpy(ptr, &txn->gasLimit, 8); ptr += 8;
+
+  encode_bigint(&ptr, txn->gasPrice);
+
+  memcpy(ptr, &txn->type, 4); ptr += 4;
+
+  memcpy(ptr, txn->chainIdHash, 32); ptr += 32;
+
+  if (include_signature) {
+    memcpy(ptr, txn->sign, txn->sig_len); ptr += txn->sig_len;
+  }
+
+  len = ptr - buf;
+  sha256(hash, buf, len);
+
+  return true;
+}
+
+bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
+  secp256k1_ecdsa_signature sig;
+  uint8_t hash[32];
+  bool ret;
+
+  DEBUG_PRINTLN("sign_transaction");
+
+  calculate_tx_hash(txn, hash, false);
+
+  DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
+
+  /* sign the message hash */
+
+  ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
+  if (ret == false) goto loc_failed;
+
+#if 0
+  ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
+  if (ret == false) goto loc_failed;
+
+  txn->sig_len = 64;  /* size of the compact signature format */
+#endif
+
+  txn->sig_len = sizeof(txn->sign);
+  ret = secp256k1_ecdsa_signature_serialize_der(instance->ecdsa, txn->sign, &txn->sig_len, &sig);
+  if (ret == false) goto loc_failed;
+
+  DEBUG_PRINT_BUFFER("signature", txn->sign, txn->sig_len);
+  return true;
+loc_failed:
+  DEBUG_PRINTF("write_signature FAILED: %d\n", ret);
+  return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
