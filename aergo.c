@@ -1127,6 +1127,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   size_t size;
   struct request *request = NULL;
   bool status = false;
+  char errmsg[256];
 
   DEBUG_PRINTLN("aergo_transfer");
 
@@ -1136,7 +1137,13 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
 
   // check if nonce was retrieved
   if (!from_account->is_updated) {
-    if (aergo_get_account_state(instance, from_account) == false) return false;
+    if (aergo_get_account_state(instance, from_account, errmsg) == false) {
+      if (receipt) {
+        strcpy(receipt->status, "FAILED");
+        strcpy(receipt->ret, errmsg);
+      }
+      return false;
+    }
   }
 
   size = sizeof(buffer);
@@ -1227,6 +1234,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   size_t size;
   struct request *request = NULL;
   bool status = false;
+  char errmsg[256];
 
   DEBUG_PRINTLN("aergo_call_smart_contract");
 
@@ -1236,7 +1244,13 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   // check if nonce was retrieved
   if (!account->is_updated) {
-    if (aergo_get_account_state(instance, account) == false) return false;
+    if (aergo_get_account_state(instance, account, errmsg) == false) {
+      if (receipt) {
+        strcpy(receipt->status, "FAILED");
+        strcpy(receipt->ret, errmsg);
+      }
+      return false;
+    }
   }
 
   size = strlen(function) + strlen2(args);
@@ -1591,7 +1605,7 @@ EXPORTED bool aergo_check_privkey(aergo *instance, aergo_account *account){
   return secp256k1_ec_seckey_verify(instance->ecdsa, account->privkey);
 }
 
-EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account){
+EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account, char *error){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
@@ -1602,7 +1616,7 @@ EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account){
 
   if (account->pubkey[0] == 0 && account->pubkey[1] == 0) {
     if (account->use_ledger) {
-      if (ledger_get_account_public_key(account) == false) {
+      if (ledger_get_account_public_key(account, error) == false) {
         return false;
       }
     } else {
@@ -1614,7 +1628,11 @@ EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account){
         ret = secp256k1_ec_pubkey_serialize(instance->ecdsa, account->pubkey,
                                           &pklen, &pubkey, SECP256K1_EC_COMPRESSED);
       }
-      if (ret != 1) return false;
+      if (ret != 1) {
+        if (error)
+          strcpy(error, "failed to get public key from the secret key");
+        return false;
+      }
     }
   }
 

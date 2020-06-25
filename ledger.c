@@ -21,7 +21,7 @@ typedef int (*fn_ledger_send_apdu)(
 
 fn_ledger_send_apdu ledger_send_apdu = NULL;
 
-bool load_ledger_library(){
+bool load_ledger_library(char *error){
   char *zFile;
 
 #ifdef _WIN32
@@ -35,16 +35,20 @@ bool load_ledger_library(){
   if (ledger_send_apdu == NULL) {
     void *h = dylib_open(zFile);
     if (h == NULL) {
-      char errmsg[256];
-      dylib_error(sizeof errmsg, errmsg);
-      printf("failed to load the libaergo-ledger library: %s", errmsg);
+      if (error) {
+        char errmsg[256];
+        dylib_error(sizeof errmsg, errmsg);
+        snprintf(error, 256, "failed to load the libaergo-ledger library: %s", errmsg);
+      }
       return false;
     }
     ledger_send_apdu = (fn_ledger_send_apdu) dylib_sym(h, "ledger_send_apdu");
     if (ledger_send_apdu == NULL) {
-      char errmsg[256];
-      dylib_error(sizeof errmsg, errmsg);
-      printf("failed to read the libaergo-ledger library: %s", errmsg);
+      if (error) {
+        char errmsg[256];
+        dylib_error(sizeof errmsg, errmsg);
+        snprintf(error, 256, "failed to read the libaergo-ledger library: %s", errmsg);
+      }
       return false;
     }
   }
@@ -52,17 +56,17 @@ bool load_ledger_library(){
   return true;
 }
 
-int ledger_get_public_key(unsigned char *path, unsigned int len, unsigned char *out, unsigned int outsize, int *psw) {
+int ledger_get_public_key(unsigned char *path, unsigned int len, unsigned char *out, unsigned int outsize, int *psw, char *error) {
 
-  if (load_ledger_library() == false) return -2;
+  if (load_ledger_library(error) == false) return -2;
 
   return ledger_send_apdu(APDU_CLA, APDU_INS_GET_PUBLIC_KEY, 0, (char*)path, len, out, outsize, psw);
 
 }
 
-int ledger_sign_transaction(const char *txn, unsigned char *out, unsigned int outsize, int *psw) {
+int ledger_sign_transaction(const char *txn, unsigned char *out, unsigned int outsize, int *psw, char *error) {
 
-  if (load_ledger_library() == false) return -2;
+  if (load_ledger_library(error) == false) return -2;
 
   return ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, strlen(txn), out, outsize, psw);
 
@@ -91,26 +95,31 @@ unsigned int get_account_derivation_path(unsigned char *path, int account_index)
   return len;
 }
 
-bool ledger_get_account_public_key(aergo_account *account){
+bool ledger_get_account_public_key(aergo_account *account, char *error){
   unsigned char pubkey[33 + 10] = {0};  /* additional bytes are required */
   unsigned char path[20];
   unsigned int len;
   int result, sw;
 
+  if (error) error[0] = 0;
+
   len = get_account_derivation_path(path, account->index);
 
-  result = ledger_get_public_key(path, len, pubkey, sizeof pubkey, &sw);
+  result = ledger_get_public_key(path, len, pubkey, sizeof pubkey, &sw, error);
 
   if (result == -1 && sw == -1) {
-    fprintf(stderr, "No dongle found or application not open\n");
+    if (error && error[0] == 0)
+      strcpy(error, "No dongle found or application not open");
     return false;
   }
   if (result < 0) {
-    fprintf(stderr, "I/O error or library not found\n");
+    if (error && error[0] == 0)
+      strcpy(error, "I/O error or library not found");
     return false;
   }
   if (sw != SW_OK) {
-    fprintf(stderr, "Dongle application error : %.4x\n", sw);
+    if (error && error[0] == 0)
+      snprintf(error, 256, "Dongle application error : %.4x", sw);
     return false;
   }
 

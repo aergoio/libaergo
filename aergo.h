@@ -43,7 +43,8 @@ struct aergo_account {
 
 bool aergo_check_privkey(aergo *instance, aergo_account *account);
 
-bool aergo_get_account_state(aergo *instance, aergo_account *account);
+/* the error string buffer must be at least 256 bytes in size */
+bool aergo_get_account_state(aergo *instance, aergo_account *account, char *error);
 
 
 // Transaction Receipt
