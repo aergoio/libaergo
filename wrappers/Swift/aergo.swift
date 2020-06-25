@@ -317,20 +317,21 @@ class Aergo {
   }
 
 
-  func get_account_state(account: AergoAccount) -> Bool {
+  func get_account_state(account: AergoAccount) -> (success: Bool, error: String) {
 
     var c_account = aergo_account()
+    var error_msg = [Int8](repeating: 0, count: 256)
 
     Aergo.update_c_account(account: account, c_account: &c_account)
 
-    if (aergo_get_account_state(instance, &c_account) == true) {
+    if (aergo_get_account_state(instance, &c_account, &error_msg) == true) {
 
       Aergo.update_account(account: account, c_account: &c_account)
 
-      return true
+      return (true, "")
     }
 
-    return false
+    return (false, String(cString: error_msg))
   }
 
 

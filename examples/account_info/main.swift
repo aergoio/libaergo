@@ -11,15 +11,13 @@ account.privkey = [UInt8](arrayLiteral:
         0xD4, 0xBA, 0xDD, 0x70, 0x01, 0xF0, 0xC5, 0x4B)
 
 
-if (aergo.get_account_state(account: account) == true) {
+var ret = aergo.get_account_state(account: account);
 
+if (ret.success) {
   print("------------------------------------")
   print("Account address: ", account.address)
   print("Account balance: ", account.balance)
   print("Account nonce: ", account.nonce)
-
 } else {
-
-  print("Failed to get the account state")
-
+  print("FAILED:", ret.error)
 }
