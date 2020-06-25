@@ -13,6 +13,7 @@ unsigned char privkey[32] = {
 int main() {
   aergo *instance;
   aergo_account account;
+  char error[256];
 
   instance = aergo_connect("testnet-api.aergo.io", 7845);
   if (!instance) {
@@ -27,12 +28,15 @@ int main() {
   memcpy(account.privkey, privkey, 32);
 
   /* get the account state (public key, address, balance, nonce...) */
-  aergo_get_account_state(instance, &account);
-
-  puts("------------------------------------");
-  printf("Account address: %s\n", account.address);
-  printf("Account balance: %f\n", account.balance);
-  printf("Account nonce: %llu\n", account.nonce);
+  if (aergo_get_account_state(instance, &account, error) == true) {
+    puts("------------------------------------");
+    printf("Account address: %s\n", account.address);
+    printf("Account balance: %f\n", account.balance);
+    printf("Account nonce: %llu\n", account.nonce);
+  } else {
+    printf("Failed getting the account state: %s\n", error);
+    return 1;
+  }
 
   while(1){
     char str[1024];
