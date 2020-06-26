@@ -49,6 +49,8 @@ size_t strlen2(const char *str){
 #include "account.c"
 #include "socket.c"
 
+#include "ledger.c"
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // DECODING
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,6 +367,7 @@ bool handle_block_response(aergo *instance, struct request *request) {
 bool handle_transfer_response(aergo *instance, struct request *request) {
   char *data = request->response;
   int len = request->received;
+  char error_msg[256];
   CommitResultList response = CommitResultList_init_zero;
 
   DEBUG_PRINT_BUFFER("handle_transfer_response", data, len);
@@ -373,8 +376,9 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
   /* Set the callback functions */
-  //response.results.funcs.decode = &decode_commit_result;
-  //response.results.arg = ...;
+  struct blob s1 = { .ptr = (uint8_t*) error_msg, .size = 256 };
+  response.results.detail.arg = &s1;
+  response.results.detail.funcs.decode = read_string;
 
   /* Decode the message */
   if (pb_decode(&stream, CommitResultList_fields, &response) == false) {
@@ -394,6 +398,13 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
               request->arg,
               (transaction_receipt *) request->return_ptr,
               true);
+  } else {
+    transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
+    if (receipt) {
+      strcpy(receipt->status, "FAILED");
+      snprintf(receipt->ret, sizeof(receipt->ret), "error %d: %s",
+          response.results.error, error_msg);
+    }
   }
 
   // xx = response.results.error;
@@ -403,6 +414,7 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
 bool handle_contract_call_response(aergo *instance, struct request *request) {
   char *data = request->response;
   int len = request->received;
+  char error_msg[256];
   CommitResultList response = CommitResultList_init_zero;
 
   DEBUG_PRINT_BUFFER("handle_contract_call_response", data, len);
@@ -411,8 +423,9 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
 
   /* Set the callback functions */
-  //response.results.funcs.decode = &decode_commit_result;
-  //response.results.arg = ...;
+  struct blob s1 = { .ptr = (uint8_t*) error_msg, .size = 256 };
+  response.results.detail.arg = &s1;
+  response.results.detail.funcs.decode = read_string;
 
   /* Decode the message */
   if (pb_decode(&stream, CommitResultList_fields, &response) == false) {
@@ -432,6 +445,13 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
               request->arg,
               (transaction_receipt *) request->return_ptr,
               true);
+  } else {
+    transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
+    if (receipt) {
+      strcpy(receipt->status, "FAILED");
+      snprintf(receipt->ret, sizeof(receipt->ret), "error %d: %s",
+          response.results.error, error_msg);
+    }
   }
 
   // xx = response.results.error;
@@ -638,14 +658,20 @@ struct txn {
   unsigned char hash[32];       // hash of the whole transaction including the signature
 };
 
+bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signature);
+
 bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
   struct txn *txn = *(struct txn **)arg;
   TxBody txbody = TxBody_init_zero;
+  bool encode_as_submessage = txn->sig_len > 0;
+  bool status;
 
   DEBUG_PRINTLN("encode_transaction_body");
 
-  if (!pb_encode_tag_for_field(stream, field))
-      return false;
+  if (encode_as_submessage) {
+    if (!pb_encode_tag_for_field(stream, field))
+        return false;
+  }
 
   txbody.type = (TxType) txn->type;
   txbody.nonce = txn->nonce;
@@ -679,7 +705,11 @@ bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void
   txbody.sign.funcs.encode = &encode_blob;
 
   /* Encode the message */
-  bool status = pb_encode_submessage(stream, TxBody_fields, &txbody);
+  if (encode_as_submessage) {
+    status = pb_encode_submessage(stream, TxBody_fields, &txbody);
+  } else {
+    status = pb_encode(stream, TxBody_fields, &txbody);
+  }
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(stream));
   }
@@ -713,7 +743,7 @@ bool encode_1_transaction(pb_ostream_t *stream, const pb_field_t *field, void * 
   return status;
 }
 
-bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct txn *txn) {
+bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct txn *txn, char *error) {
   TxList message = TxList_init_zero;
   uint32_t size;
 
@@ -729,7 +759,7 @@ bool encode_transaction(uint8_t *buffer, size_t *psize, char *txn_hash, struct t
   /* Decode the message */
   bool status = pb_encode(&stream, TxList_fields, &message);
   if (!status) {
-    DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
+    snprintf(error, 256, "transaction encoding failed: %s\n", PB_GET_ERROR(&stream));
     return false;
   }
 
@@ -762,7 +792,7 @@ bool encode_bigint(uint8_t **pptr, uint64_t value){
 }
 
 bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signature){
-  uint8_t buf[1024], *ptr;
+  uint8_t buf[4096], *ptr;
   size_t len = 0;
 
   DEBUG_PRINTLN("calculate_tx_hash");
@@ -800,40 +830,67 @@ bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signat
   len = ptr - buf;
   sha256(hash, buf, len);
 
+  DEBUG_PRINT_BUFFER("txn hash", hash, 32);
+
   return true;
 }
 
-bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn){
-  secp256k1_ecdsa_signature sig;
-  uint8_t hash[32];
-  bool ret;
+bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn, char *error){
 
   DEBUG_PRINTLN("sign_transaction");
 
-  calculate_tx_hash(txn, hash, false);
-
-  DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
-
-  /* sign the message hash */
-
-  ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
-  if (ret == false) goto loc_failed;
-
+  if (account->use_ledger) {
+    char txn_data[64 * 1024];
+    int txn_size;
+    /* encode the transaction */
+    pb_ostream_t stream = pb_ostream_from_buffer(&txn_data[1], sizeof(txn_data) - 1);
+    if (encode_transaction_body(&stream, NULL, (void**)&txn) == false) {
+      strcpy(error, "failed to encode the transaction");
+      goto loc_failed;
+    }
+    txn_data[0] = txn->type;
+    txn_size = stream.bytes_written + 1;
+    DEBUG_PRINT_BUFFER("Transaction", txn_data, txn_size);
+    /* select the account on the device */
+    //if (ledger_get_account_public_key(account, error) == false) {
+    //  goto loc_failed;
+    //}
+    /* send the transaction to be signed */
+    txn->sig_len = sizeof(txn->sign);
+    DEBUG_PRINTF("account selected. signing on ledger... sizeof(sig)=%d\n", txn->sig_len);
+    if (ledger_sign_transaction(txn_data, txn_size, txn->sign, &txn->sig_len, error) == false) {
+      goto loc_failed;
+    }
+  } else {
+    secp256k1_ecdsa_signature sig;
+    uint8_t hash[32];
+    bool ret;
+    /* calculate the transaction hash */
+    calculate_tx_hash(txn, hash, false);
+    DEBUG_PRINT_BUFFER("  hash", hash, sizeof(hash));
+    /* sign the transaction hash */
+    ret = secp256k1_ecdsa_sign(instance->ecdsa, &sig, hash, account->privkey, NULL, NULL);
+    if (ret == false) {
+      strcpy(error, "failed to sign the transaction");
+      goto loc_failed;
+    }
 #if 0
-  ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
-  if (ret == false) goto loc_failed;
-
-  txn->sig_len = 64;  /* size of the compact signature format */
+    ret = secp256k1_ecdsa_signature_serialize_compact(instance->ecdsa, txn->sign, &sig);
+    if (ret == false) goto loc_failed;
+    txn->sig_len = 64;  /* size of the compact signature format */
 #endif
-
-  txn->sig_len = sizeof(txn->sign);
-  ret = secp256k1_ecdsa_signature_serialize_der(instance->ecdsa, txn->sign, &txn->sig_len, &sig);
-  if (ret == false) goto loc_failed;
+    txn->sig_len = sizeof(txn->sign);
+    ret = secp256k1_ecdsa_signature_serialize_der(instance->ecdsa, txn->sign, &txn->sig_len, &sig);
+    if (ret == false) {
+      strcpy(error, "failed to serialize the signature");
+      goto loc_failed;
+    }
+  }
 
   DEBUG_PRINT_BUFFER("signature", txn->sign, txn->sig_len);
   return true;
 loc_failed:
-  DEBUG_PRINTF("write_signature FAILED: %d\n", ret);
+  DEBUG_PRINTF("sign_transaction: %s\n", error);
   return false;
 }
 
@@ -841,8 +898,8 @@ loc_failed:
 // COMMAND ENCODING
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * instance, aergo_account *account, const char *recipient, const uint8_t *amount, int amount_len) {
-  struct txn txn;
+bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * instance, aergo_account *account, const char *recipient, const uint8_t *amount, int amount_len, char *error) {
+  struct txn txn = {0};
   char out[64]={0};
 
   DEBUG_PRINTLN("EncodeTransfer");
@@ -867,15 +924,15 @@ bool EncodeTransfer(uint8_t *buffer, size_t *psize, char *txn_hash, aergo * inst
   DEBUG_PRINTF("account address: %s\n", out);
   DEBUG_PRINTF("account nonce: %" PRIu64 "\n", account->nonce);
 
-  if (sign_transaction(instance, account, &txn) == false) {
+  if (sign_transaction(instance, account, &txn, error) == false) {
     return false;
   }
 
-  return encode_transaction(buffer, psize, txn_hash, &txn);
+  return encode_transaction(buffer, psize, txn_hash, &txn, error);
 }
 
-bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, const char *contract_address, const char *call_info, aergo *instance, aergo_account *account) {
-  struct txn txn;
+bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, const char *contract_address, const char *call_info, aergo *instance, aergo_account *account, char *error) {
+  struct txn txn = {0};
 
   DEBUG_PRINTLN("EncodeContractCall");
 
@@ -902,11 +959,11 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, const ch
   }
 #endif
 
-  if (sign_transaction(instance, account, &txn) == false) {
+  if (sign_transaction(instance, account, &txn, error) == false) {
     return false;
   }
 
-  return encode_transaction(buffer, psize, txn_hash, &txn);
+  return encode_transaction(buffer, psize, txn_hash, &txn, error);
 }
 
 bool EncodeQuery(uint8_t *buffer, size_t *psize, const char *contract_address, const char *query_info){
@@ -1145,7 +1202,7 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
   size_t size;
   struct request *request = NULL;
   bool status = false;
-  char errmsg[256];
+  char error[256];
 
   DEBUG_PRINTLN("aergo_transfer");
 
@@ -1155,10 +1212,10 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
 
   // check if nonce was retrieved
   if (!from_account->is_updated) {
-    if (aergo_get_account_state(instance, from_account, errmsg) == false) {
+    if (aergo_get_account_state(instance, from_account, error) == false) {
       if (receipt) {
         strcpy(receipt->status, "FAILED");
-        strcpy(receipt->ret, errmsg);
+        strcpy(receipt->ret, error);
       }
       return false;
     }
@@ -1166,7 +1223,11 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
 
   size = sizeof(buffer);
   if (EncodeTransfer(buffer, &size, txn_hash, instance,
-                     from_account, to_account, amount, len) == false) {
+                     from_account, to_account, amount, len, error) == false) {
+    if (receipt) {
+      strcpy(receipt->status, "FAILED");
+      strcpy(receipt->ret, error);
+    }
     return false;
   }
 
@@ -1252,7 +1313,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
   size_t size;
   struct request *request = NULL;
   bool status = false;
-  char errmsg[256];
+  char error[256];
 
   DEBUG_PRINTLN("aergo_call_smart_contract");
 
@@ -1262,10 +1323,10 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   // check if nonce was retrieved
   if (!account->is_updated) {
-    if (aergo_get_account_state(instance, account, errmsg) == false) {
+    if (aergo_get_account_state(instance, account, error) == false) {
       if (receipt) {
         strcpy(receipt->status, "FAILED");
-        strcpy(receipt->ret, errmsg);
+        strcpy(receipt->ret, error);
       }
       return false;
     }
@@ -1278,7 +1339,7 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   if (args && strlen(args) > 0) {
     snprintf(call_info, size + 32,
-            "{\"Name\":\"%s\", \"Args\":%s}", function, args);
+            "{\"Name\":\"%s\",\"Args\":%s}", function, args);
   } else {
     snprintf(call_info, size + 32,
             "{\"Name\":\"%s\"}", function);
@@ -1286,7 +1347,11 @@ static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_
 
   size += 300;
   if (EncodeContractCall(buffer, &size, txn_hash, contract_address,
-                         call_info, instance, account) == false) {
+                         call_info, instance, account, error) == false) {
+    if (receipt) {
+      strcpy(receipt->status, "FAILED");
+      strcpy(receipt->ret, error);
+    }
     goto loc_exit;
   }
 
@@ -1365,7 +1430,7 @@ static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contrac
 
   if (args && strlen(args) > 0) {
     snprintf(query_info, size + 32,
-            "{\"Name\":\"%s\", \"Args\":%s}", function, args);
+            "{\"Name\":\"%s\",\"Args\":%s}", function, args);
   } else {
     snprintf(query_info, size + 32,
             "{\"Name\":\"%s\"}", function);
@@ -1615,8 +1680,6 @@ EXPORTED bool aergo_get_blockchain_status(aergo *instance){
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include "ledger.c"
 
 EXPORTED bool aergo_check_privkey(aergo *instance, aergo_account *account){
   if (!instance || !account) return false;

@@ -64,12 +64,57 @@ int ledger_get_public_key(unsigned char *path, unsigned int len, unsigned char *
 
 }
 
+/*
 int ledger_sign_transaction(const char *txn, unsigned char *out, unsigned int outsize, int *psw, char *error) {
 
   if (load_ledger_library(error) == false) return -2;
 
   return ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, strlen(txn), out, outsize, psw);
 
+}
+*/
+
+bool check_ledger_result(int result, int sw, char *error){
+
+  if (result == -1 && sw == -1) {
+    if (error && error[0] == 0)
+      strcpy(error, "No dongle found or application not open");
+    return false;
+  }
+  if (result < 0) {
+    if (error && error[0] == 0)
+      strcpy(error, "I/O error or library not found");
+    return false;
+  }
+  if (sw != SW_OK) {
+    if (error && error[0] == 0)
+      snprintf(error, 256, "Dongle application error : %.4x", sw);
+    return false;
+  }
+
+  return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool ledger_sign_transaction(const char *txn, int txn_size, unsigned char *sig, size_t *psigsize, char *error) {
+  char out[32+80+8];
+  int sigsize = *psigsize;
+  int result, sw;
+
+  if (error) error[0] = 0;
+
+  if (load_ledger_library(error) == false) return false;
+
+  result = ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, txn_size, out, sizeof out, &sw);
+
+  if (result > 0) {
+    DEBUG_PRINT_BUFFER("ledger txn hash", out, 32);
+    memcpy(sig, out + 32, result - 32);
+    *psigsize = result - 32;
+  }
+
+  return check_ledger_result(result, sw, error);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,19 +152,7 @@ bool ledger_get_account_public_key(aergo_account *account, char *error){
 
   result = ledger_get_public_key(path, len, pubkey, sizeof pubkey, &sw, error);
 
-  if (result == -1 && sw == -1) {
-    if (error && error[0] == 0)
-      strcpy(error, "No dongle found or application not open");
-    return false;
-  }
-  if (result < 0) {
-    if (error && error[0] == 0)
-      strcpy(error, "I/O error or library not found");
-    return false;
-  }
-  if (sw != SW_OK) {
-    if (error && error[0] == 0)
-      snprintf(error, 256, "Dongle application error : %.4x", sw);
+  if (check_ledger_result(result, sw, error) == false) {
     return false;
   }
 
