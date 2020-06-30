@@ -32,6 +32,9 @@ You can download binaries for iOS and Windows in the [releases](https://github.c
 
 libaergo depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
 
+It also depends on [hidapi](https://github.com/libusb/hidapi)
+when interfacing with a Ledger Nano S
+
 
 ### Compiling the dependencies
 
@@ -55,6 +58,19 @@ Compiling and installing `secp256k1-vrf`:
 git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
 cd secp256k1-vrf
 ./autogen.sh
+./configure
+make
+sudo make install
+cd ..
+```
+
+Compiling and installing `hidapi` (only required if using a Ledger device):
+
+```
+sudo apt-get install libudev-dev libusb-1.0-0-dev
+git clone --depth=1 https://github.com/libusb/hidapi
+cd hidapi
+./bootstrap
 ./configure
 make
 sudo make install
