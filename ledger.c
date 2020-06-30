@@ -10,20 +10,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-int ledger_get_public_key(unsigned char *path, unsigned int len, unsigned char *out, unsigned int outsize, int *psw, char *error) {
-
-  return ledger_send_apdu(APDU_CLA, APDU_INS_GET_PUBLIC_KEY, 0, (char*)path, len, out, outsize, psw, error);
-
-}
-
-/*
-int ledger_sign_transaction(const char *txn, unsigned char *out, unsigned int outsize, int *psw, char *error) {
-
-  return ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, strlen(txn), out, outsize, psw);
-
-}
-*/
-
 bool check_ledger_result(int result, int sw, char *error){
 
   if (result == -1 && sw == -1) {
@@ -94,7 +80,7 @@ bool ledger_get_account_public_key(aergo_account *account, char *error){
 
   len = get_account_derivation_path(path, account->index);
 
-  result = ledger_get_public_key(path, len, pubkey, sizeof pubkey, &sw, error);
+  result = ledger_send_apdu(APDU_CLA, APDU_INS_GET_PUBLIC_KEY, 0, path, len, pubkey, sizeof pubkey, &sw, error);
 
   if (check_ledger_result(result, sw, error) == false) {
     return false;
