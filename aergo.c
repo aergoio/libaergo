@@ -857,7 +857,7 @@ bool sign_transaction(aergo *instance, aergo_account *account, struct txn *txn, 
     //}
     /* send the transaction to be signed */
     txn->sig_len = sizeof(txn->sign);
-    DEBUG_PRINTF("account selected. signing on ledger... sizeof(sig)=%d\n", txn->sig_len);
+    DEBUG_PRINTLN("signing transaction on ledger...");
     if (ledger_sign_transaction(txn_data, txn_size, txn->sign, &txn->sig_len, error) == false) {
       goto loc_failed;
     }

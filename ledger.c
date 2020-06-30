@@ -1,5 +1,4 @@
-#include "dynamic-lib.c"
-//#include "libaergo-ledger.h"
+#include "ledger/ledger-api.c"
 
 #define APDU_CLA   0xAE
 
@@ -9,65 +8,16 @@
 #define APDU_INS_SIGN_TXN        0x04
 #define APDU_INS_SIGN_MSG        0x08
 
-#define SW_OK      0x9000
-#define SW_UNKNOWN 0x6D00
-
-typedef int (*fn_ledger_send_apdu)(
-  unsigned char apdu_cla, unsigned char apdu_ins, unsigned char apdu_p1,
-  const char *data, unsigned int datalen,
-  unsigned char *out, unsigned int outsize,
-  int *psw
-);
-
-fn_ledger_send_apdu ledger_send_apdu = NULL;
-
-bool load_ledger_library(char *error){
-  char *zFile;
-
-#ifdef _WIN32
-  zFile = "libaergo-ledger.dll";
-#elif __APPLE__
-  zFile = "libaergo-ledger.dylib";
-#else
-  zFile = "libaergo-ledger.so";
-#endif
-
-  if (ledger_send_apdu == NULL) {
-    void *h = dylib_open(zFile);
-    if (h == NULL) {
-      if (error) {
-        char errmsg[256];
-        dylib_error(sizeof errmsg, errmsg);
-        snprintf(error, 256, "failed to load the libaergo-ledger library: %s", errmsg);
-      }
-      return false;
-    }
-    ledger_send_apdu = (fn_ledger_send_apdu) dylib_sym(h, "ledger_send_apdu");
-    if (ledger_send_apdu == NULL) {
-      if (error) {
-        char errmsg[256];
-        dylib_error(sizeof errmsg, errmsg);
-        snprintf(error, 256, "failed to read the libaergo-ledger library: %s", errmsg);
-      }
-      return false;
-    }
-  }
-
-  return true;
-}
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 int ledger_get_public_key(unsigned char *path, unsigned int len, unsigned char *out, unsigned int outsize, int *psw, char *error) {
 
-  if (load_ledger_library(error) == false) return -2;
-
-  return ledger_send_apdu(APDU_CLA, APDU_INS_GET_PUBLIC_KEY, 0, (char*)path, len, out, outsize, psw);
+  return ledger_send_apdu(APDU_CLA, APDU_INS_GET_PUBLIC_KEY, 0, (char*)path, len, out, outsize, psw, error);
 
 }
 
 /*
 int ledger_sign_transaction(const char *txn, unsigned char *out, unsigned int outsize, int *psw, char *error) {
-
-  if (load_ledger_library(error) == false) return -2;
 
   return ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, strlen(txn), out, outsize, psw);
 
@@ -102,11 +52,7 @@ bool ledger_sign_transaction(const char *txn, int txn_size, unsigned char *sig, 
   int sigsize = *psigsize;
   int result, sw;
 
-  if (error) error[0] = 0;
-
-  if (load_ledger_library(error) == false) return false;
-
-  result = ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, txn_size, out, sizeof out, &sw);
+  result = ledger_send_apdu(APDU_CLA, APDU_INS_SIGN_TXN, 0, txn, txn_size, out, sizeof out, &sw, error);
 
   if (result > 0) {
     DEBUG_PRINT_BUFFER("ledger txn hash", out, 32);
@@ -145,8 +91,6 @@ bool ledger_get_account_public_key(aergo_account *account, char *error){
   unsigned char path[20];
   unsigned int len;
   int result, sw;
-
-  if (error) error[0] = 0;
 
   len = get_account_derivation_path(path, account->index);
 
