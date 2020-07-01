@@ -1741,7 +1741,7 @@ EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account, c
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 EXPORTED char * aergo_lib_version() {
-  return "0.1.0";
+  return "1.1.0";
 }
 
 EXPORTED aergo * aergo_connect(const char *host, int port) {

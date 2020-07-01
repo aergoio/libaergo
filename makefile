@@ -18,8 +18,8 @@ else
 endif
 
 ifeq ($(TARGET_OS),Windows)
-	IMPLIB   := libaergo-0.1
-	LIBRARY  := libaergo-0.1.dll
+	IMPLIB   := libaergo-1.1
+	LIBRARY  := libaergo-1.1.dll
 	WINLIB   := $(IMPLIB).lib
 	CFLAGS   := $(CFLAGS) -DMBEDTLS_PLATFORM_C
 	LDFLAGS  := $(LDFLAGS) -static-libgcc -static-libstdc++
@@ -35,11 +35,11 @@ else
 		LIBRARY  = libaergo.0.dylib
 		LIBNICK  = libaergo.dylib
 		INSTNAME = $(LIBPATH)/$(LIBNICK)
-		CURR_VERSION   = 0.1.0
-		COMPAT_VERSION = 0.1.0
+		CURR_VERSION   = 1.1.0
+		COMPAT_VERSION = 1.1.0
 		WARNINGS = -Wno-pointer-sign -Wno-incompatible-pointer-types-discards-qualifiers
 	else
-		LIBRARY  = libaergo.so.0.1
+		LIBRARY  = libaergo.so.1.1
 		LIBNICK  = libaergo.so
 		SONAME   = $(LIBNICK)
 		WARNINGS = -Wno-pointer-sign -Wno-discarded-qualifiers
