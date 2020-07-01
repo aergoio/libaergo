@@ -27,7 +27,8 @@ EXPORTED int ledger_send_apdu(
 
   if (error) error[0] = 0;
 
-  if (initDongle(error) != 0) goto loc_exit;
+  result = initDongle(error);
+  if (result != 0) goto loc_exit;
 
   /* open the device */
 
