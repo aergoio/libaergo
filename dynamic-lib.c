@@ -8,25 +8,40 @@
 static void *dylib_open(const char *zFilename){
   HANDLE h;
   h = LoadLibraryA(zFilename);
-  OSTRACE(("DLOPEN name=%s, handle=%p\n", zFilename, (void*)h));
   return (void*)h;
 }
 
 static void (*dylib_sym(void *pH,const char *zSym))(void){
   FARPROC proc;
   proc = GetProcAddress((HANDLE)pH, zSym);
-  OSTRACE(("DLSYM handle=%p, symbol=%s, address=%p\n",
-           (void*)pH, zSym, (void*)proc));
   return (void(*)(void))proc;
-}
-
-static void dylib_error(int nBuf, char *zBufOut){
-  winGetLastErrorMsg(osGetLastError(), nBuf, zBufOut);
 }
 
 static void dylib_close(void *pHandle){
   FreeLibrary((HANDLE)pHandle);
-  OSTRACE(("DLCLOSE handle=%p\n", (void*)pHandle));
+}
+
+static void dylib_error(int nBuf, char *zBuf){
+  DWORD lastErrno = GetLastError();
+  DWORD dwLen = 0;
+  char *zTemp = NULL;
+  dwLen = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                         FORMAT_MESSAGE_FROM_SYSTEM |
+                         FORMAT_MESSAGE_IGNORE_INSERTS,
+                         NULL,
+                         lastErrno,
+                         0,
+                         (LPSTR) &zTemp,
+                         0,
+                         0);
+  if (dwLen > 0) {
+    /* copy a maximum of nBuf chars to output buffer */
+    snprintf(zBuf, nBuf, "%s", zTemp);
+    /* free the system buffer allocated by FormatMessage */
+    LocalFree(zTemp);
+  } else {
+    snprintf(zBuf, nBuf, "OsError 0x%lx (%lu)", lastErrno, lastErrno);
+  }
 }
 
 
