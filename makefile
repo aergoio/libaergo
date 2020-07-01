@@ -32,7 +32,7 @@ else ifeq ($(TARGET_OS),iPhoneSimulator)
 	CFLAGS += -fPIC -fvisibility=hidden
 else
 	ifeq ($(TARGET_OS),Mac)
-		LIBRARY  = libaergo.0.dylib
+		LIBRARY  = libaergo.1.dylib
 		LIBNICK  = libaergo.dylib
 		INSTNAME = $(LIBPATH)/$(LIBNICK)
 		CURR_VERSION   = 1.1.0
@@ -81,7 +81,7 @@ libaergo.a: aergo.o
 
 
 # Linux / Unix
-libaergo.so.0.1: aergo.o
+libaergo.so.1.1: aergo.o
 	$(CC) -shared -Wl,-soname,$(SONAME)  -o $@  $^  $(LDLIBS) $(LDFLAGS) -ldl
 ifeq ($(MAKECMDGOALS),valgrind)
 else ifeq ($(MAKECMDGOALS),debug)
@@ -91,7 +91,7 @@ endif
 	ln -sf $(LIBRARY) $(LIBNICK)
 
 # OSX
-libaergo.0.dylib: aergo.o
+libaergo.1.dylib: aergo.o
 	$(CC) -dynamiclib -install_name "$(INSTNAME)" -current_version $(CURR_VERSION) -compatibility_version $(COMPAT_VERSION)  -o $@  $^  $(LDLIBS) $(LDFLAGS)
 ifeq ($(MAKECMDGOALS),valgrind)
 else ifeq ($(MAKECMDGOALS),debug)
@@ -110,7 +110,7 @@ else
 endif
 
 # Windows
-libaergo-0.1.dll: aergo.o
+libaergo-1.1.dll: aergo.o
 	$(CC) -shared  -o $@  $^  -Wl,--out-implib,$(IMPLIB).lib $(LDLIBS) $(LDFLAGS) -lws2_32
 ifeq ($(MAKECMDGOALS),valgrind)
 else ifeq ($(MAKECMDGOALS),debug)
