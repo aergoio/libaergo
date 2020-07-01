@@ -22,6 +22,12 @@ namespace account_info_cs
                     }
                 };
 
+                /* or use the account on Ledger Nano S */
+                //AergoClient.AergoAccount account = new AergoClient.AergoAccount
+                //{
+                //    use_ledger = true
+                //};
+
                 Console.WriteLine("Sending request...");
 
                 var ret = client.GetAccountInfo(ref account);

@@ -12,8 +12,8 @@ unsigned char privkey[32] = {
 
 int main() {
   aergo *instance;
-  aergo_account account;
-  char errmsg[256];
+  aergo_account account = {0};
+  char error[256];
 
   instance = aergo_connect("testnet-api.aergo.io", 7845);
   if (!instance) {
@@ -24,18 +24,20 @@ int main() {
   puts("Connected");
 
   /* load the private key in the account */
-  memset(&account, 0, sizeof(aergo_account));
   memcpy(account.privkey, privkey, 32);
+  /* or use the account on Ledger Nano S */
+  //account.use_ledger = true;
+  //account.index = 0;
 
   /* get the account state (public key, address, balance, nonce...) */
-  if (aergo_get_account_state(instance, &account, errmsg) == true) {
+  if (aergo_get_account_state(instance, &account, error) == true) {
     puts("------------------------------------");
     printf("Account address: %s\n", account.address);
     printf("Account balance: %f\n", account.balance);
     printf("Account nonce: %llu\n", account.nonce);
     //printf("Account state_root: %s\n", account.state_root);
   } else {
-    printf("Failed to get the account state: %s\n", errmsg);
+    printf("Failed to get the account state: %s\n", error);
   }
 
   aergo_free(instance);

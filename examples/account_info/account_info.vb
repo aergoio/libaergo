@@ -12,6 +12,10 @@
                                          &H4E, &HE5, &HC, &H2C, &HD4, &HBA, &HDD, &H70, &H1, &HF0,
                                          &HC5, &H4B}}
 
+            ' or use the account on Ledger Nano S
+            'Dim account As AergoClient.AergoAccount = New AergoClient.AergoAccount With
+            '    {.use_ledger = True}
+
             Dim ret = client.GetAccountInfo(account)
 
             If ret.success Then
