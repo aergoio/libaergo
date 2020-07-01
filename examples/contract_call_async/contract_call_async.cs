@@ -31,6 +31,12 @@ namespace contract_call_async_cs
                         0x61, 0x76 }
                 };
 
+                /* or use an account on Ledger Nano S */
+                //AergoClient.AergoAccount account = new AergoClient.AergoAccount
+                //{
+                //    use_ledger = true
+                //};
+
                 var context = new AergoClient.CallbackState() { data = "any object can be set here as context" };
 
                 Console.WriteLine("Calling Smart Contract Function...");

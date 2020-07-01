@@ -12,6 +12,10 @@
                                         &H2D, &HB3, &H3F, &HB6, &H1F, &H31, &HEB, &H57, &HE7, &H24,
                                         &H61, &H76}}
 
+            ' or use an account on Ledger Nano S
+            'Dim account As AergoClient.AergoAccount = New AergoClient.AergoAccount With
+            '    {.use_ledger = True}
+
             Console.WriteLine("Calling Smart Contract Function...")
 
             Dim receipt = client.CallSmartContract(account, "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7", "set_name", "VB.NET")

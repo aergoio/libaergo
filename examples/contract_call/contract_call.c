@@ -12,7 +12,7 @@ unsigned char privkey[32] = {
 
 int main() {
   aergo *instance;
-  aergo_account account;
+  aergo_account account = {0};
   char error[256];
 
   instance = aergo_connect("testnet-api.aergo.io", 7845);
@@ -24,8 +24,10 @@ int main() {
   puts("Connected");
 
   /* load the private key in the account */
-  memset(&account, 0, sizeof(aergo_account));
   memcpy(account.privkey, privkey, 32);
+  /* or use the account on Ledger Nano S */
+  //account.use_ledger = true;
+  //account.index = 0;
 
   /* get the account state (public key, address, balance, nonce...) */
   if (aergo_get_account_state(instance, &account, error) == true) {
@@ -74,7 +76,7 @@ int main() {
       printf("gasUsed: %llu\n", receipt.gasUsed);
       printf("feeUsed: %f\n", receipt.feeUsed);
     } else {
-      puts("failed sending transaction");
+      printf("failed sending transaction: %s\n", receipt.ret);
     }
 
   }

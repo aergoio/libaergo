@@ -15,6 +15,9 @@ int main() {
 
   /* load the private key in the account */
   std::memcpy(account.privkey, privkey, 32);
+  /* or use the account on Ledger Nano S */
+  //account.use_ledger = true;
+  //account.index = 0;
 
   /* get the account state (public key, address, balance, nonce...) */
   if (aergo.get_account_state(&account, error) == true) {

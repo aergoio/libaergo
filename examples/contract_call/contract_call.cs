@@ -20,6 +20,12 @@ namespace contract_call_example
                     }
                 };
 
+                /* or use an account on Ledger Nano S */
+                //AergoClient.AergoAccount account = new AergoClient.AergoAccount
+                //{
+                //    use_ledger = true
+                //};
+
                 Console.WriteLine("Calling Smart Contract...");
 
                 AergoClient.TransactionReceipt receipt = client.CallSmartContract(ref account, "AmgLnRaGFLyvCPCEMHYJHooufT1c1pENTRGeV78WNPTxwQ2RYUW7", "set_name", "C# App");
