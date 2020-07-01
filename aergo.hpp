@@ -67,8 +67,8 @@ public:
     return aergo_check_privkey(instance, account);
   }
 
-  bool get_account_state(aergo_account *account) {
-    return aergo_get_account_state(instance, account);
+  bool get_account_state(aergo_account *account, char *error) {
+    return aergo_get_account_state(instance, account, error);
   }
 
 
