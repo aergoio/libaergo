@@ -94,6 +94,12 @@ bool load_hidapi_library(char *error){
   return true;
 loc_failed:
   dylib_close(h);
+  hid_init = NULL;
+  hid_exit = NULL;
+  hid_open = NULL;
+  hid_close = NULL;
+  hid_write = NULL;
+  hid_read_timeout = NULL;
   return false;
 }
 
@@ -112,6 +118,7 @@ int initHidapi(char *error) {
 /*****************************************************************************/
 
 int exitHidapi() {
+  if (!hid_exit) return -1;
   return hid_exit();
 }
 
@@ -135,7 +142,9 @@ hid_device* getFirstDongleHidapi() {
 /*****************************************************************************/
 
 void closeDongleHidapi(hid_device *handle) {
-  hid_close(handle);
+  if (hid_close) {
+    hid_close(handle);
+  }
 }
 
 /*****************************************************************************/
