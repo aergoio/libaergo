@@ -52,10 +52,6 @@ public:
     aergo_free(instance);
   }
 
-  void set_error_handler(error_handler_cb cb, void *arg) {
-    aergo_set_error_handler(instance, cb, arg);
-  }
-
   int process_requests(int timeout = 0) {
     return aergo_process_requests(instance, timeout);
   }

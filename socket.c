@@ -178,10 +178,6 @@ loc_error:
 
   DEBUG_PRINTF("\n  ERROR: %s\n\n", request->error_msg);
 
-  if (instance->error_handler) {
-    instance->error_handler(instance->error_handler_arg, request->error_msg);
-  }
-
   return false;
 }
 

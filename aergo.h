@@ -15,13 +15,6 @@ aergo * aergo_connect(const char *host, int port);
 
 void aergo_free(aergo *instance);
 
-typedef void (*error_handler_cb)(void *arg, const char *error_msg);
-
-void aergo_set_error_handler(
-  aergo *instance,
-  error_handler_cb cb,
-  void *arg);
-
 int aergo_process_requests(aergo *instance, int timeout);
 
 
