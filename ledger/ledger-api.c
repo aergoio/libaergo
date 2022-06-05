@@ -80,7 +80,9 @@ EXPORTED int ledger_send_apdu(
       /* send the request and wait for the result */
 
       result = sendApduDongle(dongle, in, apduSize, out, outsize, &sw);
-      if (result < 0 || sw != SW_OK) goto loc_exit;
+      if (result < 0) goto loc_exit;
+      if (sw == 0x9001) { result = 0; break; }  /* re-send first chunk */
+      if (sw != SW_OK) goto loc_exit;
       if (result > 0) break;
 
       offset += len;
