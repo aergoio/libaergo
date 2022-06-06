@@ -65,9 +65,11 @@ unsigned int get_account_derivation_path(unsigned char *path, int account_index)
   /* convert to big endian */
   len = 0;
   for(i=0; i<5; i++){
-    copy_be32((uint32_t*)path+len, &ipath[i]);
+    copy_be32((uint32_t*)(path+len), &ipath[i]);
     len += 4;
   }
+
+  DEBUG_PRINT_BUFFER("account derivation path", path, len);
 
   return len;
 }
