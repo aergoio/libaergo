@@ -28,7 +28,7 @@ bool decode_address(const char *encoded, size_t encsize, void *out, size_t outsi
 
   b58_sha256_impl = sha256;
 
-  if (outsize < AddressLength) return false;
+  if (encsize < EncodedAddressLength || outsize < AddressLength) return false;
 
   decsize = sizeof(decoded);
   if (b58tobin(decoded, &decsize, encoded, encsize) == false) return false;
