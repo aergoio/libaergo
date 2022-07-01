@@ -663,6 +663,7 @@ bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signat
 bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
   struct txn *txn = *(struct txn **)arg;
   TxBody txbody = TxBody_init_zero;
+  int recipient_len;
   bool encode_as_submessage = txn->sig_len > 0;
   bool status;
 
@@ -680,7 +681,12 @@ bool encode_transaction_body(pb_ostream_t *stream, const pb_field_t *field, void
   txbody.account.arg = &acc;
   txbody.account.funcs.encode = encode_blob;
 
-  struct blob rec = { .ptr = txn->recipient, .size = AddressLength };
+  if (txn->recipient[0]){
+    recipient_len = AddressLength;
+  } else {
+    recipient_len = 0;
+  }
+  struct blob rec = { .ptr = txn->recipient, .size = recipient_len };
   txbody.recipient.arg = &rec;
   txbody.recipient.funcs.encode = encode_blob;
 
@@ -803,9 +809,9 @@ bool calculate_tx_hash(struct txn *txn, unsigned char *hash, bool include_signat
 
   memcpy(ptr, txn->account, AddressLength); ptr += AddressLength;
 
-  //if (txn->recipient){
+  if (txn->recipient[0]){
     memcpy(ptr, txn->recipient, AddressLength); ptr += AddressLength;
-  //}
+  }
 
   // it must be at least 1 byte in size!
   memcpy(ptr, txn->amount, txn->amount_len); ptr += txn->amount_len;
@@ -948,6 +954,41 @@ bool EncodeContractCall(uint8_t *buffer, size_t *psize, char *txn_hash, const ch
   txn.gasLimit = 0;
   txn.gasPrice = 0;          // variable-length big-endian integer
   txn.type = TxType_CALL;
+  txn.chainIdHash = blockchain_id_hash;
+
+#ifdef DEBUG_MESSAGES
+  {
+  char out[64]={0};
+  encode_address(txn.account, sizeof txn.account, out, sizeof out);
+  DEBUG_PRINTF("account address: %s\n", out);
+  DEBUG_PRINTF("account nonce: %" PRIu64 "\n", account->nonce);
+  }
+#endif
+
+  if (sign_transaction(instance, account, &txn, error) == false) {
+    return false;
+  }
+
+  return encode_transaction(buffer, psize, txn_hash, &txn, error);
+}
+
+bool EncodeMultiCall(uint8_t *buffer, size_t *psize, char *txn_hash, const char *payload, aergo *instance, aergo_account *account, char *error) {
+  struct txn txn = {0};
+
+  DEBUG_PRINTLN("EncodeMultiCall");
+
+  /* increment the account nonce */
+  account->nonce++;
+
+  txn.nonce = account->nonce;
+  memcpy(txn.account, account->pubkey, sizeof txn.account);
+  memset(txn.recipient, 0, sizeof(txn.recipient));
+  txn.amount = null_byte;   // variable-length big-endian integer
+  txn.amount_len = 1;
+  txn.payload = payload;
+  txn.gasLimit = 0;
+  txn.gasPrice = 0;          // variable-length big-endian integer
+  txn.type = TxType_MULTICALL;
   txn.chainIdHash = blockchain_id_hash;
 
 #ifdef DEBUG_MESSAGES
@@ -1304,6 +1345,74 @@ EXPORTED bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb c
            "%" PRIu64 ".%018" PRIu64, integer, decimal);
 
   return aergo_transfer_str_async(instance, cb, arg, from_account, to_account, amount_str);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool aergo_multicall__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, const char *payload){
+  uint8_t *buffer=NULL, txn_hash[32];
+  size_t size;
+  struct request *request = NULL;
+  bool status = false;
+  char error[256];
+
+  DEBUG_PRINTLN("aergo_multicall");
+
+  if (!instance || !account || !payload) return false;
+
+  if (check_blockchain_id_hash(instance) == false) return false;
+
+  // check if nonce was retrieved
+  if (!account->is_updated) {
+    if (aergo_get_account_state(instance, account, error) == false) {
+      if (receipt) {
+        strcpy(receipt->status, "FAILED");
+        strcpy(receipt->ret, error);
+      }
+      return false;
+    }
+  }
+
+  size = strlen(payload);
+  size += 300;
+
+  buffer = malloc(size);
+  if (!buffer) goto loc_exit;
+
+  if (EncodeMultiCall(buffer, &size, txn_hash, payload,
+                      instance, account, error) == false) {
+    if (receipt) {
+      strcpy(receipt->status, "FAILED");
+      strcpy(receipt->ret, error);
+    }
+    goto loc_exit;
+  }
+
+  request = new_request(instance);
+  if (!request) goto loc_exit;
+
+  request->data = buffer;
+  request->size = size;
+  memcpy(request->txn_hash, txn_hash, 32);
+  request->callback = cb;
+  request->arg = arg;
+  request->return_ptr = receipt;
+
+  status = send_grpc_request(instance, "CommitTX", request, handle_contract_call_response);
+
+loc_exit:
+  if (buffer) free(buffer);
+  return status;
+}
+
+EXPORTED bool aergo_multicall(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *payload){
+  if (!receipt) return false;
+  return aergo_multicall__int(instance, NULL, NULL, receipt, account, payload);
+}
+
+EXPORTED bool aergo_multicall_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *payload){
+  if (!cb) return false;
+  return aergo_multicall__int(instance, cb, arg, NULL, account, payload);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

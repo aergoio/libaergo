@@ -22,11 +22,12 @@ typedef enum _TxType {
     TxType_FEEDELEGATION = 3,
     TxType_TRANSFER = 4,
     TxType_CALL = 5,
-    TxType_DEPLOY = 6
+    TxType_DEPLOY = 6,
+    TxType_MULTICALL = 7
 } TxType;
 #define _TxType_MIN TxType_NORMAL
-#define _TxType_MAX TxType_DEPLOY
-#define _TxType_ARRAYSIZE ((TxType)(TxType_DEPLOY+1))
+#define _TxType_MAX TxType_MULTICALL
+#define _TxType_ARRAYSIZE ((TxType)(TxType_MULTICALL+1))
 
 typedef enum _CommitStatus {
     CommitStatus_TX_OK = 0,

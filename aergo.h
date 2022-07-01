@@ -169,6 +169,23 @@ bool aergo_call_smart_contract_async(aergo *instance,
 
 
 
+// MultiCall - synchronous
+
+bool aergo_multicall(aergo *instance,
+  transaction_receipt *receipt,
+  aergo_account *account,
+  const char *payload);
+
+// MultiCall - asynchronous
+
+bool aergo_multicall_async(aergo *instance,
+  transaction_receipt_cb cb,
+  void *arg,
+  aergo_account *account,
+  const char *payload);
+
+
+
 // Query smart contract - synchronous
 
 bool aergo_query_smart_contract_json(aergo *instance,
