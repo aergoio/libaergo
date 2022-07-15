@@ -60,20 +60,32 @@ bool get_function_pointer(void *h, char *function_name, void **fn_ptr, char *err
 /*****************************************************************************/
 
 bool load_hidapi_library(char *error){
-  char *zFile;
+  char *zFile1, *zFile2, *zFile3;
 
   if (hid_init != NULL) return true;
 
 #ifdef _WIN32
-  zFile = "hidapi.dll";
+  zFile1 = "hidapi.dll";
+  zFile2 = "hidapi-hidraw.dll";
+  zFile3 = "hidapi-libusb.dll";
 #elif __APPLE__
-  zFile = "libhidapi.dylib";
+  zFile1 = "libhidapi.dylib";
+  zFile2 = "libhidapi-hidraw.dylib";
+  zFile3 = "libhidapi-libusb.dylib";
 #else
-  zFile = "libhidapi.so";
+  zFile1 = "libhidapi.so";
+  zFile2 = "libhidapi-hidraw.so";
+  zFile3 = "libhidapi-libusb.so";
 #endif
 
   /* load the library */
-  void *h = dylib_open(zFile);
+  void *h = dylib_open(zFile1);
+  if (h == NULL) {
+    h = dylib_open(zFile2);
+  }
+  if (h == NULL) {
+    h = dylib_open(zFile3);
+  }
   if (h == NULL) {
     if (error) {
       char errmsg[256];
