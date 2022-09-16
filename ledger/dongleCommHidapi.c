@@ -20,9 +20,9 @@
 #include "dongleCommHidapi.h"
 
 #define LEDGER_VID 0x2C97
-#define BLUE_PID 0x0000
-//#define NANOS_PID 0x0001
-#define NANOS_PID 0x1011
+#define NANOS_PID  0x1011
+#define NANOX_PID  0x4011
+#define NANOSP_PID 0x5011
 
 #define TIMEOUT 60000
 #define SW1_DATA 0x61
@@ -138,13 +138,15 @@ int exitHidapi() {
 
 hid_device* getFirstDongleHidapi() {
   hid_device *result;
-#if 0
-  result = hid_open(LEDGER_VID, BLUE_PID, NULL);
+  result = hid_open(LEDGER_VID, NANOS_PID, NULL);
   if (result != NULL) {
     return result;
   }
-#endif
-  result = hid_open(LEDGER_VID, NANOS_PID, NULL);
+  result = hid_open(LEDGER_VID, NANOSP_PID, NULL);
+  if (result != NULL) {
+    return result;
+  }
+  result = hid_open(LEDGER_VID, NANOX_PID, NULL);
   if (result != NULL) {
     return result;
   }
