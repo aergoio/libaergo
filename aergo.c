@@ -361,6 +361,11 @@ bool handle_block_response(aergo *instance, struct request *request) {
   DEBUG_PRINTF("Block timestamp: %" PRIu64 "\n", block.header.timestamp);
   DEBUG_PRINTF("Block confirms: %" PRIu64 "\n", block.header.confirms);
 
+  if (request->callback) {
+    block_stream_cb callback = request->callback;
+    callback(block.header.blockNo, block.header.timestamp);
+  }
+
   return true;
 }
 
@@ -1740,8 +1745,7 @@ EXPORTED bool aergo_get_block_async(aergo *instance, uint64_t blockNo){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
-EXPORTED bool aergo_block_stream_subscribe(aergo *instance){
+EXPORTED bool aergo_block_stream_subscribe(aergo *instance, block_stream_cb cb){
   uint8_t buffer[32];
   size_t size;
   struct request *request = NULL;
@@ -1763,7 +1767,6 @@ EXPORTED bool aergo_block_stream_subscribe(aergo *instance){
 
   return send_grpc_request(instance, "ListBlockStream", request, handle_block_response);
 }
-*/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

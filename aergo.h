@@ -251,7 +251,10 @@ bool aergo_contract_events_subscribe(aergo *instance,
 
 bool aergo_get_block(aergo *instance, uint64_t block_number);
 
-bool aergo_block_stream_subscribe(aergo *instance);
+
+typedef void (*block_stream_cb)(uint64_t block_number, uint64_t timestamp);
+
+bool aergo_block_stream_subscribe(aergo *instance, block_stream_cb cb);
 
 
 // Status
