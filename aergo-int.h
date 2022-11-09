@@ -4,23 +4,15 @@
 
 #include <errno.h>
 
-#ifdef _WIN32
-#include <winsock2.h>
+#ifdef WIN32
+#include <windows.h>
+#elif _POSIX_C_SOURCE >= 199309L
+#include <time.h>   // for nanosleep
 #else
-#include <sys/socket.h>  /* socket, connect */
-#include <sys/select.h>
-#include <netinet/in.h>  /* struct sockaddr_in, struct sockaddr */
-#include <netinet/tcp.h> /* TCP_NODELAY */
-#include <netinet/ip.h>
-#include <netdb.h>       /* struct hostent, gethostbyname */
-#include <unistd.h>      /* read, write, close */
-#define SOCKET int
-#define INVALID_SOCKET  (~0)
-#define SOCKET_ERROR    (-1)
-typedef struct sockaddr_in SOCKADDR_IN;
-typedef struct sockaddr SOCKADDR;
+#include <unistd.h> // for usleep
 #endif
 
+#include <curl/curl.h>
 
 #include "secp256k1-vrf.h"
 
@@ -38,6 +30,7 @@ typedef bool (*process_response_cb)(aergo *instance, request *request);
 
 struct request {
   struct request *next;
+  aergo *instance;
   void *data;
   int size;
   struct aergo_account *account;
@@ -48,12 +41,12 @@ struct request {
   int return_size;
   process_response_cb process_response;
   process_response_cb process_error;
-  SOCKET sock;
   char *response;
   int response_size;
+  int remaining_size;
   int received;
   bool processed;
-  bool response_ok;
+  bool success;
   char *error_msg;
   bool keep_active;
 };
@@ -67,6 +60,8 @@ struct aergo {
   uint8_t blockchain_id_hash[32];
   int timeout;
   request *requests;
+  CURLM *multi;
+  int transfers;  // num_requests
 };
 
 

@@ -1220,7 +1220,7 @@ static request * new_request(aergo *instance) {
   if (!request) return NULL;
 
   memset(request, 0, sizeof(struct request));
-  request->sock = INVALID_SOCKET;
+  request->instance = instance;
 
   llist_add(&instance->requests, request);
 
