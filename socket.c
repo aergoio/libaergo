@@ -330,6 +330,16 @@ static bool new_http_request(aergo *instance, char *url, struct request *request
 
   printf("new_request: %s\n", url);
 
+  if (request->data) {
+    char *ptr = malloc(request->size);
+    if (!ptr) {
+      request->data = NULL;
+      return false;
+    }
+    memcpy(ptr, request->data, request->size);
+    request->data = ptr;
+  }
+
   if (instance->multi == NULL) {
     instance->multi = curl_multi_init();
     if (instance->multi == NULL) return false;
@@ -347,7 +357,7 @@ static bool new_http_request(aergo *instance, char *url, struct request *request
 
   /* custom HTTP headers */
   headers = curl_slist_append(headers, "User-Agent: libaergo/0.1");
-  headers = curl_slist_append(headers, "Content-Type: application/grpc");
+  headers = curl_slist_append(headers, "Content-Type: application/grpc+proto");
   curl_easy_setopt(easy, CURLOPT_HTTPHEADER, headers);
 
   /* now specify the POST data */

@@ -1231,6 +1231,7 @@ void free_request(aergo *instance, struct request *request) {
 
   if (!instance || !request) return;
 
+  if (request->data)     free(request->data);
   if (request->response) free(request->response);
 
   llist_remove(&instance->requests, request);
