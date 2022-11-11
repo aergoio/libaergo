@@ -236,6 +236,19 @@ static void process_request_error(struct request *request, char *error_msg) {
 
 }
 
+static size_t server_header_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
+  struct request *request = (struct request *) userdata;
+  printf("HEADER %s\n", buffer);
+  if (strstr(buffer, "grpc-message: ") != NULL) {
+    puts("processing error message...");
+    char *error_msg = buffer + 14;  //strlen("grpc-message: ");
+    char *ptr = strstr(error_msg, "\r\n");
+    if (ptr) *ptr = 0;
+    process_request_error(request, error_msg);
+  }
+  return nitems * size;
+}
+
 static size_t server_response_callback(void *contents, size_t num_blocks, size_t block_size, void *userp){
   struct request *request = (struct request *) userp;
   size_t size = num_blocks * block_size;
@@ -348,9 +361,13 @@ static bool new_http_request(aergo *instance, char *url, struct request *request
   // for debug only
   curl_easy_setopt(easy, CURLOPT_VERBOSE, 1L);
 
-  /* write data to a struct  */
+  /* set the server response callback */
   curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, server_response_callback);
   curl_easy_setopt(easy, CURLOPT_WRITEDATA, request);
+
+  /* set the server header callback */
+  curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, server_header_callback);
+  curl_easy_setopt(easy, CURLOPT_HEADERDATA, request);
 
   /* pointer to the request */
   //curl_easy_setopt(easy, CURLOPT_PRIVATE, request);
