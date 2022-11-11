@@ -15,30 +15,6 @@ static void sleep_ms(int milliseconds){ // cross-platform sleep function
 #endif
 }
 
-static bool http_strip_header(aergo *instance, request *request){
-  char *ptr, *error_msg;
-
-  DEBUG_PRINTLN("http_strip_header");
-
-  error_msg = strstr(request->response, "grpc-message: ");
-  if (error_msg) {
-    error_msg += strlen("grpc-message: ");
-    ptr = strstr(error_msg, "\r\n");
-    if (ptr) *ptr = 0;
-    request->error_msg = error_msg;
-    goto loc_error;
-  }
-
-  return true;
-
-loc_error:
-
-  DEBUG_PRINTF("\n  ERROR: %s\n\n", request->error_msg);
-
-  return false;
-}
-
-
 static int aergo_process_requests__int(
   aergo *instance,
   int timeout,
@@ -61,11 +37,11 @@ loc_again:
     struct CURLMsg *m;
 
     mcode = curl_multi_perform(instance->multi, &still_running);
-    printf("curl_multi_perform ret=%d\n", mcode);
+    DEBUG_PRINTF("curl_multi_perform ret=%d\n", mcode);
     if (mcode) goto loc_failed;
 
     mcode = curl_multi_wait(instance->multi, NULL, 0, timeout, &numfds);
-    printf("curl_multi_wait ret=%d\n", mcode);
+    DEBUG_PRINTF("curl_multi_wait ret=%d\n", mcode);
     if (mcode) goto loc_failed;
 
     if (numfds == 0 && timeout > 0) {
@@ -79,16 +55,10 @@ loc_again:
     do {
       int msgq = 0;
       m = curl_multi_info_read(instance->multi, &msgq);
-      printf("curl_multi_info_read ret=%p\n", m);
+      DEBUG_PRINTF("curl_multi_info_read ret=%p\n", m);
       if (m && (m->msg == CURLMSG_DONE)) {
         CURL *easy = m->easy_handle;
-        puts("REQUEST DONE.");
-#if 0
-        curl_easy_getinfo(easy, CURLINFO_PRIVATE, &request);
-        if (request) {
-
-        }
-#endif
+        DEBUG_PRINTLN("REQUEST DONE.");
         /* remove the CURL request */
         curl_multi_remove_handle(instance->multi, easy);
         curl_easy_cleanup(easy);
@@ -107,79 +77,6 @@ loc_again:
       goto loc_again;
     }
   }
-
-
-
-#if 0
-
-  // get the list of active sockets and put them in the readfs
-  FD_ZERO(&readset);
-  max = 0;
-  for (request=instance->requests; request; request=request->next) {
-    if (request->sock != INVALID_SOCKET && !request->processed) {
-      DEBUG_PRINTLN("  add request to set");
-      FD_SET(request->sock, &readset);
-      if (request->sock > max) max = request->sock;
-    }
-  }
-  if (max == 0) goto loc_exit;
-
-  // set the timeout
-  tv.tv_sec = timeout / 1000;
-  tv.tv_usec = (timeout % 1000) * 1000;
-
-  // check if some socket has data to be read
-  ret = select(max+1, &readset, NULL, NULL, &tv);
-  // error
-  if (ret < 0) goto loc_failed;
-  // no data to be read
-  if (ret == 0) goto loc_exit;
-
-  // for each "set" socket, process the incoming data
-  for (request=instance->requests; request; request=request->next) {
-    if (request->sock != INVALID_SOCKET && FD_ISSET(request->sock, &readset)) {
-      /* read data from socket */
-      ret = http_get_response(request);
-      if (ret > 0) {
-        request->processed = true;
-        /* remove the HTTP header */
-        if (http_strip_header(instance, request)) {
-          /* parse the received data */
-          request->response_ok = true;
-          bool success = request->process_response(instance, request);
-          if (request == main_request && psuccess) {
-            *psuccess = success;
-          }
-        }
-        if (!request->keep_active) {
-          /* mark to release the request */
-          ret = -1;
-        }
-      }
-      if (ret < 0) {
-        request->processed = true;
-        if (!request->error_msg) {
-          request->error_msg = "connection or allocation error";
-        }
-        if (!request->response_ok && request->process_error) {
-          /* it uses the return value here because the error handler
-          ** can retry the request. this is used for receipts */
-          bool success = request->process_error(instance, request);
-          if (request == main_request && psuccess) {
-            *psuccess = success;
-          }
-        }
-        /* close the socket */
-        close_socket(request->sock);
-        request->sock = INVALID_SOCKET;
-      }
-    }
-  }
-
-#endif
-
-
-
 
 loc_exit:
 
@@ -238,13 +135,13 @@ static void process_request_error(struct request *request, char *error_msg) {
 
 static size_t server_header_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
   struct request *request = (struct request *) userdata;
-  printf("HEADER %s", buffer);
+  DEBUG_PRINTF("HEADER %s", buffer);
   if (strstr(buffer, "grpc-message: ") != NULL) {
     char *error_msg = buffer + 14;  //strlen("grpc-message: ");
     char *ptr = strstr(error_msg, "\r\n");
     if (ptr) *ptr = 0;
     if (strlen(error_msg) > 0) {
-      puts("processing error message...");
+      DEBUG_PRINTLN("processing error message...");
       process_request_error(request, error_msg);
     }
   }
@@ -257,7 +154,7 @@ static size_t server_response_callback(void *contents, size_t num_blocks, size_t
   size_t to_process;
   char *ptr = contents;
 
-  printf("server_response_callback size=%zu\n", size);
+  DEBUG_PRINTF("server_response_callback size=%zu\n", size);
 
   if (!request) return 0;
 
@@ -282,7 +179,7 @@ loc_again:
     /* allocate space for the entire message */
     request->response = malloc(msg_size);
     if (!request->response) {
-      //printf("not enough memory (malloc returned NULL)\n");
+      //DEBUG_PRINTF("not enough memory (malloc returned NULL)\n");
       process_request_error(request, "out of memory");
       return 0;
     }
@@ -330,7 +227,7 @@ static bool new_http_request(aergo *instance, char *url, struct request *request
   struct curl_slist *headers = NULL;
   CURL *easy;
 
-  printf("new_request: %s\n", url);
+  DEBUG_PRINTF("new_request: %s\n", url);
 
   if (request->data) {
     char *ptr = malloc(request->size);
@@ -371,7 +268,7 @@ static bool new_http_request(aergo *instance, char *url, struct request *request
   curl_easy_setopt(easy, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE);
 
   // for debug only
-  curl_easy_setopt(easy, CURLOPT_VERBOSE, 1L);
+  //curl_easy_setopt(easy, CURLOPT_VERBOSE, 1L);
 
   /* set the server response callback */
   curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, server_response_callback);
@@ -413,7 +310,6 @@ bool send_grpc_request(
            instance->host, instance->port, service);
 
   /* prepare the HTTP request */
-  //new_http_request(multi, url, request->data, request->size);
   if (new_http_request(instance, url, request) == false) {
     return false;
   }
