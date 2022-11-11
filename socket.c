@@ -238,13 +238,15 @@ static void process_request_error(struct request *request, char *error_msg) {
 
 static size_t server_header_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
   struct request *request = (struct request *) userdata;
-  printf("HEADER %s\n", buffer);
+  printf("HEADER %s", buffer);
   if (strstr(buffer, "grpc-message: ") != NULL) {
-    puts("processing error message...");
     char *error_msg = buffer + 14;  //strlen("grpc-message: ");
     char *ptr = strstr(error_msg, "\r\n");
     if (ptr) *ptr = 0;
-    process_request_error(request, error_msg);
+    if (strlen(error_msg) > 0) {
+      puts("processing error message...");
+      process_request_error(request, error_msg);
+    }
   }
   return nitems * size;
 }
