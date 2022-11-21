@@ -18,6 +18,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: ubuntu
+      if: ${{ matrix.platform == 'ubuntu-latest' }}
+      run: sudo apt install libcurl4-openssl-dev -y
     - name: mac
       if: ${{ matrix.platform == 'macos-latest' }}
       run: brew install automake
