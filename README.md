@@ -43,7 +43,7 @@ First install the tools required for compilation
 On Linux:
 
 ```
-sudo apt-get install gcc make automake libtool -y
+sudo apt-get install gcc make automake libtool libcurl4-openssl-dev -y
 ```
 
 On Mac:
