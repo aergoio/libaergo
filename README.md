@@ -30,7 +30,9 @@ You can download binaries for iOS and Windows in the [releases](https://github.c
 
 ## Dependencies
 
-libaergo depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf)
+libaergo depends on [secp256k1-vrf](https://github.com/aergoio/secp256k1-vrf) and [libcurl](https://github.com/curl/curl)
+
+Use the `http1` branch if you want a version that does not depend on libcurl. Subscriptions to events are not possible on that case.
 
 It also depends on [hidapi](https://github.com/libusb/hidapi)
 when interfacing with a Ledger Nano S
