@@ -1,0 +1,30 @@
+name: MSYS2
+on: [push, pull_request]
+
+jobs:
+  msys2-ucrt64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install:  mingw-w64-ucrt-x86_64-gcc base-devel libcurl-devel git autotools
+      - name: CI-Build
+        run: |
+          git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
+          cd secp256k1-vrf
+          ./autogen.sh
+          ./configure
+          make 
+          make install
+          cd ..
+          LDLIBS=" -L/ucrt64/lib -lsecp256k1-vrf  -lgmp -L/usr/lib -lcurl" CFLAGS="-I/usr/include" make
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libaergo-1.1.dll
+          path: ./libaergo-1.1.dll
