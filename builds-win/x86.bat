@@ -1,13 +1,12 @@
 @REM build a 32-bit version of the library
 
-set curdir=%cd%
 set root=%cd%
-call C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat
+call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
 cd %root%
 echo Going to %root%
 set vcpkgdir=C:\vcpkg\installed\x86-windows
 
-cl.exe /dll /MT /D_USRDLL /D_WINDLL /DWIN32 /D_WIN32 /I .\nanopb /I %root%\secp256k1-vrf\include  /I %vcpkgdir%\include  /DMBEDTLS_PLATFORM_C  libcurl.lib secp256k1-vrf.lib ws2_32.lib  aergo.c  win32/dllmain.c /LD /Felibaergo-1.1.dll /link /LIBPATH:%root%\win32 /LIBPATH:%vcpkgdir%\lib
+cl.exe /MT /D_USRDLL /D_WINDLL /DWIN32 /D_WIN32 /I .\nanopb /I %root%\secp256k1-vrf\include  /I %vcpkgdir%\include  /DMBEDTLS_PLATFORM_C  libcurl.lib secp256k1-vrf.lib ws2_32.lib  aergo.c  win32/dllmain.c /LD /Felibaergo-1.1.dll /link /LIBPATH:%root%\win32 /LIBPATH:%vcpkgdir%\lib
 
 @REM Move 32-bit dlls
 

@@ -1,30 +1,72 @@
-name: MSYS2
-on: [push, pull_request]
+name: BuildWin
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
-  msys2-ucrt64:
+  build:
+
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install:  mingw-w64-ucrt-x86_64-gcc base-devel libcurl-devel git autotools
-      - name: CI-Build
-        run: |
-          git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
-          cd secp256k1-vrf
-          ./autogen.sh
-          ./configure
-          make 
-          make install
-          cd ..
-          LDLIBS=" -L/ucrt64/lib -lsecp256k1-vrf  -lgmp -L/usr/lib -lcurl" CFLAGS="-I/usr/include" make
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libaergo-1.1.dll
-          path: ./libaergo-1.1.dll
+    - uses: actions/checkout@v2
+    - name: install libcurl
+      shell: cmd
+      run: |
+        vcpkg install curl[http2]:x64-windows
+    - name: clone secp256k1 source files
+      shell: cmd
+      run: |
+        git clone https://github.com/aergoio/secp256k1-vrf
+    - name: download libsecp256k1-vrf library
+      shell: powershell
+      run: |
+        wget  https://github.com/aergoio/secp256k1-vrf/releases/download/v0.1/secp256k1-vrf-windows.zip -outfile secp256k1-vrf.zip
+        tar xf secp256k1-vrf.zip
+    - name: build x64
+      shell: cmd
+      run: |
+        builds-win\x64.bat
+    - name: list files
+      shell: cmd
+      run: |
+        dir builds-win\x64
+    - name: Copy required runtime dlls for testing executables
+      shell: cmd
+      run: |
+        copy C:\vcpkg\installed\x64-windows\bin\libcurl.dll .
+        copy C:\vcpkg\installed\x64-windows\bin\zlib1.dll .
+        copy C:\vcpkg\installed\x64-windows\bin\nghttp2.dll .
+        copy x64\secp256k1-vrf.dll .
+
+    - name: test C compilation
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        set vcpkgdir=C:\vcpkg\installed\x64-windows
+        cl.exe /I. examples\contract_query\contract_query.c builds-win\x64\libaergo-1.1.lib 
+    - name: test C execution
+      shell: cmd
+      run: |
+        .\contract_query.exe
+    - name: test C++ compilation
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        set vcpkgdir=C:\vcpkg\installed\x64-windows
+        cl.exe /std:c++17 /I. examples\contract_query\contract_query.cpp builds-win\x64\libaergo-1.1.lib /Fecontract_query_cpp.exe
+    - name: test C++ execution
+      shell: cmd
+      run: |
+        .\contract_query_cpp.exe
+    - name: upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: libaergo-windows
+        path: |
+          builds-win/x64
+
