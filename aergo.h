@@ -2,20 +2,26 @@
 #include <stdbool.h>
 
 
+#ifdef _WIN32
+#define EXPORTED __declspec(dllexport)
+#else
+#define EXPORTED __attribute__((visibility("default")))
+#endif
+
 // Library version in string format
 
-char * aergo_lib_version();
+EXPORTED char * aergo_lib_version();
 
 
 // Connection
 
 typedef struct aergo aergo;
 
-aergo * aergo_connect(const char *host, int port);
+EXPORTED aergo * aergo_connect(const char *host, int port);
 
-void aergo_free(aergo *instance);
+EXPORTED void aergo_free(aergo *instance);
 
-int aergo_process_requests(aergo *instance, int timeout);
+EXPORTED int aergo_process_requests(aergo *instance, int timeout);
 
 
 // Accounts
@@ -34,10 +40,10 @@ struct aergo_account {
   bool is_updated;
 };
 
-bool aergo_check_privkey(aergo *instance, aergo_account *account);
+EXPORTED bool aergo_check_privkey(aergo *instance, aergo_account *account);
 
 /* the error string buffer must be at least 256 bytes in size */
-bool aergo_get_account_state(aergo *instance, aergo_account *account, char *error);
+EXPORTED bool aergo_get_account_state(aergo *instance, aergo_account *account, char *error);
 
 
 // Transaction Receipt
@@ -59,11 +65,11 @@ struct transaction_receipt {
 
 typedef void (*transaction_receipt_cb)(void *arg, transaction_receipt *receipt);
 
-bool aergo_get_receipt(aergo *instance,
+EXPORTED bool aergo_get_receipt(aergo *instance,
   const char *txn_hash,
   struct transaction_receipt *receipt);
 
-bool aergo_get_receipt_async(aergo *instance,
+EXPORTED bool aergo_get_receipt_async(aergo *instance,
   const char *txn_hash,
   transaction_receipt_cb cb,
   void *arg);
@@ -71,26 +77,26 @@ bool aergo_get_receipt_async(aergo *instance,
 
 // Transfer - synchronous
 
-bool aergo_transfer(aergo *instance,
+EXPORTED bool aergo_transfer(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *from_account,
   const char *to_account,
   double value);
 
-bool aergo_transfer_int(aergo *instance,
+EXPORTED bool aergo_transfer_int(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *from_account,
   const char *to_account,
   uint64_t integer,
   uint64_t decimal);
 
-bool aergo_transfer_str(aergo *instance,
+EXPORTED bool aergo_transfer_str(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *from_account,
   const char *to_account,
   const char *value);
 
-bool aergo_transfer_bignum(aergo *instance,
+EXPORTED bool aergo_transfer_bignum(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *from_account,
   const char *to_account,
@@ -99,14 +105,14 @@ bool aergo_transfer_bignum(aergo *instance,
 
 // Transfer - asynchronous
 
-bool aergo_transfer_async(aergo *instance,
+EXPORTED bool aergo_transfer_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *from_account,
   const char *to_account,
   double value);
 
-bool aergo_transfer_int_async(aergo *instance,
+EXPORTED bool aergo_transfer_int_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *from_account,
@@ -114,14 +120,14 @@ bool aergo_transfer_int_async(aergo *instance,
   uint64_t integer,
   uint64_t decimal);
 
-bool aergo_transfer_str_async(aergo *instance,
+EXPORTED bool aergo_transfer_str_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *from_account,
   const char *to_account,
   const char *value);
 
-bool aergo_transfer_bignum_async(aergo *instance,
+EXPORTED bool aergo_transfer_bignum_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *from_account,
@@ -133,14 +139,14 @@ bool aergo_transfer_bignum_async(aergo *instance,
 
 // Call smart contract function - synchronous
 
-bool aergo_call_smart_contract_json(aergo *instance,
+EXPORTED bool aergo_call_smart_contract_json(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *account,
   const char *contract_address,
   const char *function,
   const char *args);
 
-bool aergo_call_smart_contract(aergo *instance,
+EXPORTED bool aergo_call_smart_contract(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *account,
   const char *contract_address,
@@ -150,7 +156,7 @@ bool aergo_call_smart_contract(aergo *instance,
 
 // Call smart contract function - asynchronous
 
-bool aergo_call_smart_contract_json_async(aergo *instance,
+EXPORTED bool aergo_call_smart_contract_json_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *account,
@@ -158,7 +164,7 @@ bool aergo_call_smart_contract_json_async(aergo *instance,
   const char *function,
   const char *args);
 
-bool aergo_call_smart_contract_async(aergo *instance,
+EXPORTED bool aergo_call_smart_contract_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *account,
@@ -171,14 +177,14 @@ bool aergo_call_smart_contract_async(aergo *instance,
 
 // MultiCall - synchronous
 
-bool aergo_multicall(aergo *instance,
+EXPORTED bool aergo_multicall(aergo *instance,
   transaction_receipt *receipt,
   aergo_account *account,
   const char *payload);
 
 // MultiCall - asynchronous
 
-bool aergo_multicall_async(aergo *instance,
+EXPORTED bool aergo_multicall_async(aergo *instance,
   transaction_receipt_cb cb,
   void *arg,
   aergo_account *account,
@@ -188,14 +194,14 @@ bool aergo_multicall_async(aergo *instance,
 
 // Query smart contract - synchronous
 
-bool aergo_query_smart_contract_json(aergo *instance,
+EXPORTED bool aergo_query_smart_contract_json(aergo *instance,
   char *result,
   int resultlen,
   const char *contract_address,
   const char *function,
   const char *args);
 
-bool aergo_query_smart_contract(aergo *instance,
+EXPORTED bool aergo_query_smart_contract(aergo *instance,
   char *result,
   int resultlen,
   const char *contract_address,
@@ -207,14 +213,14 @@ bool aergo_query_smart_contract(aergo *instance,
 
 typedef void (*query_smart_contract_cb)(void *arg, bool success, char *result);
 
-bool aergo_query_smart_contract_json_async(aergo *instance,
+EXPORTED bool aergo_query_smart_contract_json_async(aergo *instance,
   query_smart_contract_cb cb,
   void *arg,
   const char *contract_address,
   const char *function,
   const char *args);
 
-bool aergo_query_smart_contract_async(aergo *instance,
+EXPORTED bool aergo_query_smart_contract_async(aergo *instance,
   query_smart_contract_cb cb,
   void *arg,
   const char *contract_address,
@@ -240,7 +246,7 @@ struct contract_event {
 
 typedef void (*contract_event_cb)(void *arg, contract_event *event);
 
-bool aergo_contract_events_subscribe(aergo *instance,
+EXPORTED bool aergo_contract_events_subscribe(aergo *instance,
   const char *contract_address,
   const char *event_name,
   contract_event_cb cb,
@@ -249,14 +255,14 @@ bool aergo_contract_events_subscribe(aergo *instance,
 
 // Blocks
 
-bool aergo_get_block(aergo *instance, uint64_t block_number);
+EXPORTED bool aergo_get_block(aergo *instance, uint64_t block_number);
 
 
 typedef void (*block_stream_cb)(uint64_t block_number, uint64_t timestamp);
 
-bool aergo_block_stream_subscribe(aergo *instance, block_stream_cb cb);
+EXPORTED bool aergo_block_stream_subscribe(aergo *instance, block_stream_cb cb);
 
 
 // Status
 
-bool aergo_get_blockchain_status(aergo *instance);
+EXPORTED bool aergo_get_blockchain_status(aergo *instance);

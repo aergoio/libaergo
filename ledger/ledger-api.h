@@ -1,7 +1,7 @@
 #ifndef __LEDGER_API_H__
 #define __LEDGER_API_H__
 
-int ledger_send_apdu(
+EXPORTED int ledger_send_apdu(
   unsigned char apdu_cla,
   unsigned char apdu_ins,
   unsigned char apdu_p1,

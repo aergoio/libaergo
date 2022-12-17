@@ -13,6 +13,27 @@
 
 //#include "base58.h"
 
+#ifdef _MSC_VER
+#define b58_alloc_mem(type, name, count) \
+	type *name = NULL; \
+	do { \
+		name = malloc(count * sizeof(type)); \
+		if (!name) { \
+			return false; \
+		} \
+	} while (0)
+
+#define b58_free_mem(v) \
+	do { \
+		if ((v)) { \
+			free((v)); \
+		} \
+	} while (0)
+#else
+#define b58_alloc_mem(type, name, count) type name[count]
+#define b58_free_mem(v)
+#endif
+
 bool (*b58_sha256_impl)(void *, const void *, size_t) = NULL;
 
 static const int8_t b58digits_map[] = {
@@ -32,7 +53,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	const unsigned char *b58u = (unsigned char*)b58;
 	unsigned char *binu = (unsigned char*)bin;
 	size_t outisz = (binsz + 3) / 4;
-	uint32_t outi[outisz];
+	b58_alloc_mem(uint32_t, outi, outisz);
 	uint64_t t;
 	uint32_t c;
 	size_t i, j;
@@ -51,12 +72,17 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	
 	for ( ; i < b58sz; ++i)
 	{
-		if (b58u[i] & 0x80)
+		if (b58u[i] & 0x80) {
+			b58_free_mem(outi);
 			// High-bit set on invalid digit
 			return false;
-		if (b58digits_map[b58u[i]] == -1)
+		}
+
+		if (b58digits_map[b58u[i]] == -1) {
+			b58_free_mem(outi);
 			// Invalid base58 digit
 			return false;
+		}
 		c = (unsigned)b58digits_map[b58u[i]];
 		for (j = outisz; j--; )
 		{
@@ -64,12 +90,16 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 			c = (t & 0x3f00000000) >> 32;
 			outi[j] = t & 0xffffffff;
 		}
-		if (c)
+		if (c) {
+			b58_free_mem(outi);
 			// Output number too big (carry to the next int32)
 			return false;
-		if (outi[0] & zeromask)
+		}
+		if (outi[0] & zeromask) {
+			b58_free_mem(outi);
 			// Output number too big (last int32 filled too far)
 			return false;
+		}
 	}
 	
 	j = 0;
@@ -102,7 +132,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 		--*binszp;
 	}
 	*binszp += zerocount;
-	
+	b58_free_mem(outi);
 	return true;
 }
 
@@ -147,7 +177,8 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 		++zcount;
 	
 	size = (binsz - zcount) * 138 / 100 + 1;
-	uint8_t buf[size];
+	b58_alloc_mem(uint8_t, buf, size);
+
 	memset(buf, 0, size);
 	
 	for (i = zcount, high = size - 1; i < binsz; ++i, high = j)
@@ -165,6 +196,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 	if (*b58sz <= zcount + size - j)
 	{
 		*b58sz = zcount + size - j + 1;
+		b58_free_mem(buf);
 		return false;
 	}
 	
@@ -174,13 +206,13 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 		b58[i] = b58digits_ordered[buf[j]];
 	b58[i] = '\0';
 	*b58sz = i + 1;
-	
+	b58_free_mem(buf);
 	return true;
 }
 
 bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, size_t datasz)
 {
-	uint8_t buf[1 + datasz + 0x20];
+	b58_alloc_mem(uint8_t, buf, 1 + datasz + 0x20);
 	uint8_t *hash = &buf[1 + datasz];
 	
 	buf[0] = ver;
@@ -188,8 +220,10 @@ bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, si
 	if (!my_dblsha256(hash, buf, datasz + 1))
 	{
 		*b58c_sz = 0;
+		b58_free_mem(buf);
 		return false;
 	}
-	
+
+	b58_free_mem(buf);
 	return b58enc(b58c, b58c_sz, buf, 1 + datasz + 4);
 }
