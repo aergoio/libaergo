@@ -1,4 +1,4 @@
-name: BuildWin
+name: Build for Windows
 
 on:
   push:
@@ -49,10 +49,12 @@ jobs:
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         set vcpkgdir=C:\vcpkg\installed\x64-windows
         cl.exe /I. examples\contract_query\contract_query.c builds-win\x64\libaergo-1.1.lib 
+        cl.exe /I. examples\multiple_tasks\multiple_tasks.c builds-win\x64\libaergo-1.1.lib 
     - name: test C execution
       shell: cmd
       run: |
         .\contract_query.exe
+        .\multiple_tasks.exe
     - name: test C++ compilation
       shell: cmd
       run: |
@@ -63,10 +65,17 @@ jobs:
       shell: cmd
       run: |
         .\contract_query_cpp.exe
+
+    - name: Prepare artifacts
+      shell: cmd
+      run: |
+        copy libcurl.dll builds-win\x64\
+        copy zlib1.dll builds-win\x64\
+        copy nghttp2.dll builds-win\x64\
+        copy secp256k1-vrf.dll builds-win\x64\
     - name: upload artifacts
       uses: actions/upload-artifact@v2
       with:
         name: libaergo-windows
         path: |
           builds-win/x64
-

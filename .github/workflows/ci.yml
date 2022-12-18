@@ -1,10 +1,11 @@
-name: C/C++ CI
+name: CI
 
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -41,9 +42,13 @@ jobs:
       if: ${{ matrix.platform == 'ubuntu-latest' }}
       run: sudo ldconfig
     - name: test C compilation
-      run: gcc examples/contract_query/contract_query.c -laergo -o contract_query
+      run: |
+        gcc examples/contract_query/contract_query.c -laergo -o contract_query
+        gcc examples/multiple_tasks/multiple_tasks.c -laergo -o multiple_tasks
     - name: test C execution
-      run: ./contract_query
+      run: |
+        ./contract_query
+        ./multiple_tasks
     - name: test C++ compilation
       run: g++ examples/contract_query/contract_query.cpp -std=c++17 -laergo -o contract_query_cpp
     - name: test C++ execution
