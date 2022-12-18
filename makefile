@@ -52,7 +52,7 @@ else
 	CFLAGS  += -fPIC -fvisibility=hidden
 endif
 
-LDLIBS  = -lsecp256k1-vrf -lcurl
+LDLIBS  ?= -lsecp256k1-vrf -lcurl
 
 
 CC    ?= gcc
