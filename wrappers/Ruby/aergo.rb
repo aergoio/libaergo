@@ -60,6 +60,12 @@ module AergoAPI
 
   attach_function 'aergo_call_smart_contract_json_async', [:pointer, :receipt_callback, :pointer, Account.by_ref, :string, :string, :string], :bool
 
+  # MultiCall
+
+  attach_function 'aergo_multicall', [:pointer, Receipt.by_ref, Account.by_ref, :string], :bool
+
+  attach_function 'aergo_multicall_async', [:pointer, :receipt_callback, :pointer, Account.by_ref, :string], :bool
+
   # Smart Contract Events
 
   class ContractEvent < FFI::Struct
@@ -200,6 +206,32 @@ class Aergo
             function,
             args.to_json)
 
+    end
+
+
+    # MultiCall
+
+    def multicall(account, payload)
+        receipt = AergoAPI::Receipt.new
+
+        ret = AergoAPI.aergo_multicall(@instance,
+            receipt,
+            account,
+            payload)
+
+        if ret == false
+            receipt[:status] = "FAILED"
+        end
+
+        receipt
+    end
+
+    def multicall_async(callback, context, account, payload)
+        AergoAPI.aergo_multicall_async(@instance,
+            callback,
+            context,
+            account,
+            payload)
     end
 
 

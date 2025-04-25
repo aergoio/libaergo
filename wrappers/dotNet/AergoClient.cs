@@ -87,7 +87,7 @@ public class AergoClient : IDisposable
         public bool is_updated;
     };
 
-    
+
     [StructLayout(LayoutKind.Sequential)]
     public struct ContractEvent
     {
@@ -137,7 +137,7 @@ public class AergoClient : IDisposable
 
     [DllImport("aergo-0.1.dll", EntryPoint = "aergo_transfer_int", CallingConvention = CallingConvention.Cdecl)]
     private static extern bool aergo_transfer_int(IntPtr _Instance, ref TransactionReceipt Receipt, ref AergoAccount Account, string ToAccount, UInt64 IntegerPart, UInt64 DecimalPart);
-    
+
     [DllImport("aergo-0.1.dll", EntryPoint = "aergo_transfer_str", CallingConvention = CallingConvention.Cdecl)]
     private static extern bool aergo_transfer_str(IntPtr _Instance, ref TransactionReceipt Receipt, ref AergoAccount Account, string ToAccount, string Value);
 
@@ -161,6 +161,12 @@ public class AergoClient : IDisposable
 
     [DllImport("aergo-0.1.dll", EntryPoint = "aergo_call_smart_contract_json_async", CallingConvention = CallingConvention.Cdecl)]
     private static extern bool aergo_call_smart_contract_json_async(IntPtr _Instance, [MarshalAs(UnmanagedType.FunctionPtr)] TransactionReceiptCallback Callback, CallbackState Context, ref AergoAccount Account, string ContractAddress, string Function, string JsonArgs);
+
+    [DllImport("aergo-0.1.dll", EntryPoint = "aergo_multicall", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool aergo_multicall(IntPtr _Instance, ref TransactionReceipt Receipt, ref AergoAccount Account, string Payload);
+
+    [DllImport("aergo-0.1.dll", EntryPoint = "aergo_multicall_async", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool aergo_multicall_async(IntPtr _Instance, [MarshalAs(UnmanagedType.FunctionPtr)] TransactionReceiptCallback Callback, CallbackState Context, ref AergoAccount Account, string Payload);
 
     [DllImport("aergo-0.1.dll", EntryPoint = "aergo_query_smart_contract_json", CallingConvention = CallingConvention.Cdecl)]
     private static extern bool aergo_query_smart_contract_json(IntPtr _Instance, [Out, MarshalAs(UnmanagedType.LPStr)] StringBuilder Result, int Size, string ContractAddress, string Function, string JsonArgs);
@@ -289,8 +295,22 @@ public class AergoClient : IDisposable
     }
 
     public bool CallSmartContractAsync(TransactionReceiptCallback Callback, CallbackState Context, ref AergoAccount account, string pContractAddress, string pFunction, params object[] parameters)
-    {        
+    {
         return aergo_call_smart_contract_json_async(_Instance, Callback, Context, ref account, pContractAddress, pFunction, ToJsonArray(parameters));
+    }
+
+    // MultiCall
+
+    public TransactionReceipt MultiCall(ref AergoAccount account, string Payload)
+    {
+        TransactionReceipt receipt = new TransactionReceipt();
+        receipt.Sent = aergo_multicall(_Instance, ref receipt, ref account, Payload);
+        return receipt;
+    }
+
+    public bool MultiCallAsync(TransactionReceiptCallback Callback, CallbackState Context, ref AergoAccount account, string Payload)
+    {
+        return aergo_multicall_async(_Instance, Callback, Context, ref account, Payload);
     }
 
     // Synchronous Transfer
@@ -333,7 +353,7 @@ public class AergoClient : IDisposable
     // Asynchronous Transfer
 
     public bool TransferAsync(ref AergoAccount account, string ToAccount, double Value, TransactionReceiptCallback Callback, CallbackState Context)
-    {        
+    {
         return aergo_transfer_async(_Instance, Callback, Context, ref account, ToAccount, Value);
     }
 

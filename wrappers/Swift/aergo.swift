@@ -470,6 +470,60 @@ class Aergo {
   }
 
 
+  func multicall(account: AergoAccount, payload: String) -> TransactionReceipt {
+    var ret: Bool
+    let receipt = TransactionReceipt()
+    var c_receipt = transaction_receipt()
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: account, c_account: &c_account)
+
+    ret = aergo_multicall(
+      instance,
+      &c_receipt,
+      &c_account,
+      payload
+    )
+
+    Aergo.update_account(account: account, c_account: &c_account)
+
+    if (ret == true) {
+      Aergo.update_receipt(receipt: receipt, c_receipt: &c_receipt)
+    }
+
+    return receipt
+  }
+
+  func multicall_async(account: AergoAccount, payload: String,
+                      callback: @escaping (Any?,TransactionReceipt)->(),
+                      context: Any? = nil) -> Bool {
+
+    var ret: Bool
+    var c_account = aergo_account()
+
+    Aergo.update_c_account(account: account, c_account: &c_account)
+
+    let callback_info = TransactionCallbackInfo(cb: callback, ctx: context)
+    let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(callback_info).toOpaque())
+
+    ret = aergo_multicall_async(
+      instance,
+      on_receipt_internal_callback,
+      ctx,
+      &c_account,
+      payload
+    )
+
+    Aergo.update_account(account: account, c_account: &c_account)
+
+    if (ret == false) {
+      // unretain the object
+      _ = Unmanaged<TransactionCallbackInfo>.fromOpaque(ctx).takeRetainedValue()
+    }
+
+    return ret
+  }
+
 
   // Synchronous Transfer - amount as Double
 

@@ -123,6 +123,17 @@ public:
     return aergo_call_smart_contract_json_async(instance, cb, arg, account, contract_address.c_str(), function.c_str(), json_args.c_str());
   }
 
+  // MultiCall - synchronous
+
+  bool multicall(transaction_receipt *receipt, aergo_account *account, string payload) {
+    return aergo_multicall(instance, receipt, account, payload.c_str());
+  }
+
+  // MultiCall - asynchronous
+
+  bool multicall_async(transaction_receipt_cb cb, void *arg, aergo_account *account, string payload) {
+    return aergo_multicall_async(instance, cb, arg, account, payload.c_str());
+  }
 
   // Query smart contract - synchronous
 
