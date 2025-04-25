@@ -229,6 +229,25 @@ EXPORTED bool aergo_query_smart_contract_async(aergo *instance,
   ...);
 
 
+// Query smart contract state variable - synchronous
+
+EXPORTED bool aergo_query_smart_contract_state_variable(aergo *instance,
+  char *result,
+  int resultlen,
+  const char *contract_address,
+  const char *state_var);
+
+// Query smart contract state variable - asynchronous
+
+typedef void (*query_state_var_cb)(void *arg, bool success, char *result);
+
+EXPORTED bool aergo_query_smart_contract_state_variable_async(aergo *instance,
+  query_state_var_cb cb,
+  void *arg,
+  const char *contract_address,
+  const char *state_var);
+
+
 // Smart contract events
 
 typedef struct contract_event contract_event;

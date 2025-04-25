@@ -173,6 +173,18 @@ bool read_bignum_to_double(pb_istream_t *stream, const pb_field_t *field, void *
     return true;
 }
 
+/* Helper function to read contract var proof value */
+bool read_contract_var_proof(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+  ContractVarProof proof = ContractVarProof_init_zero;
+  struct blob *buffer = (struct blob *)*arg;
+
+  /* Set up callback for value field */
+  proof.value.arg = buffer;
+  proof.value.funcs.decode = &read_string;
+
+  return pb_decode(stream, ContractVarProof_fields, &proof);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // ENCODING
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -508,6 +520,10 @@ bool handle_query_response(aergo *instance, struct request *request) {
   /* Decode the message */
   if (pb_decode(&stream, SingleBytes_fields, &response) == false) {
     DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    if (request->callback && request->return_ptr) {
+      free(request->return_ptr);
+      request->return_ptr = NULL;
+    }
     return false;
   }
 
@@ -516,6 +532,55 @@ bool handle_query_response(aergo *instance, struct request *request) {
     callback(request->arg, true, request->return_ptr);
     free(request->return_ptr);
     request->return_ptr = NULL;
+  }
+
+  return true;
+}
+
+bool handle_query_state_var_response(aergo *instance, struct request *request) {
+  char *data = request->response;
+  int len = request->received;
+  StateQueryProof response = StateQueryProof_init_zero;
+
+  DEBUG_PRINT_BUFFER("handle_query_state_var_response", data, len);
+
+  if (request->callback) {
+    //assert(request->return_ptr == NULL);
+    //assert(request->return_size == 0);
+    request->return_size = len;
+    request->return_ptr = malloc(request->return_size);
+    if (!request->return_ptr) return false;
+  }
+  memset(request->return_ptr, 0, request->return_size);
+
+  /* Create a stream that reads from the buffer */
+  pb_istream_t stream = pb_istream_from_buffer((const unsigned char *)&data[5], len-5);
+
+  /* Set up the callbacks for contract var proofs */
+  struct blob s1 = { .ptr = (uint8_t*) request->return_ptr, .size = request->return_size };
+  response.varProofs.arg = &s1;
+  response.varProofs.funcs.decode = &read_contract_var_proof;
+
+  /* Decode the message */
+  if (pb_decode(&stream, StateQueryProof_fields, &response) == false) {
+    DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
+    if (request->callback && request->return_ptr) {
+      free(request->return_ptr);
+      request->return_ptr = NULL;
+    }
+    return false;
+  }
+
+  bool success = (request->return_ptr && ((char*)request->return_ptr)[0] != '\0');
+
+  if (request->callback) {
+    query_state_var_cb callback = (query_state_var_cb) request->callback;
+    callback(request->arg, success, success ? request->return_ptr : "No state variable value found");
+    free(request->return_ptr);
+    request->return_ptr = NULL;
+  } else if (!success) {
+    // fill the return_ptr with an error message
+    strcpy(request->return_ptr, "No state variable value found");
   }
 
   return true;
@@ -1027,8 +1092,70 @@ bool EncodeQuery(uint8_t *buffer, size_t *psize, const char *contract_address, c
   message.queryinfo.funcs.encode = &encode_string;
   message.queryinfo.arg = query_info;
 
-  /* Decode the message */
+  /* Encode the message */
   bool status = pb_encode(&stream, Query_fields, &message);
+  if (!status) {
+    DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
+    return false;
+  }
+
+  size = encode_http2_data_frame(buffer, stream.bytes_written);
+
+  DEBUG_PRINT_BUFFER("Message", buffer, size);
+
+  *psize = size;
+  return true;
+}
+
+bool EncodeStateQuery(uint8_t *buffer, size_t *psize, const char *contract_address, const char *var_name) {
+  StateQuery message = StateQuery_init_zero;
+  uint32_t size;
+  uint8_t hash_buffer[32];
+  char key_buffer[256];
+
+  DEBUG_PRINTLN("EncodeStateQuery");
+
+  /* Create a stream that writes to the buffer */
+  pb_ostream_t stream = pb_ostream_from_buffer(&buffer[5], *psize - 5);
+
+  /* Check if var_name starts with "raw:" prefix */
+  if (strncmp(var_name, "raw:", 4) == 0) {
+    /* For raw keys, just use the part after "raw:" without any transformation */
+    strncpy(key_buffer, var_name + 4, sizeof(key_buffer) - 1);
+    key_buffer[sizeof(key_buffer) - 1] = '\0';  /* Ensure null termination */
+  } else {
+    /* Transform the key: add "_sv_" prefix and handle array notation */
+    snprintf(key_buffer, sizeof(key_buffer), "_sv_%s", var_name);
+    /* Handle array notation: replace "[" with "-" and remove ending "]" */
+    char *open_bracket = strchr(key_buffer, '[');
+    if (open_bracket != NULL) {
+      *open_bracket = '-';
+      char *close_bracket = strrchr(key_buffer, ']');
+      if (close_bracket != NULL) {
+        *close_bracket = '\0';
+      }
+    }
+  }
+
+  DEBUG_PRINTF("Transformed key: %s\n", key_buffer);
+
+  /* Hash the transformed key */
+  sha256(hash_buffer, (uint8_t*)key_buffer, strlen(key_buffer));
+
+  /* Set the callback functions */
+  message.contractAddress.funcs.encode = &encode_account_address;
+  message.contractAddress.arg = contract_address;
+
+  /* Setup storage keys */
+  struct blob key_blob = { .ptr = hash_buffer, .size = 32 };
+  message.storageKeys.arg = &key_blob;
+  message.storageKeys.funcs.encode = &encode_blob;
+
+  /* Set compressed flag */
+  message.compressed = true;
+
+  /* Encode the message */
+  bool status = pb_encode(&stream, StateQuery_fields, &message);
   if (!status) {
     DEBUG_PRINTF("Encoding failed: %s\n", PB_GET_ERROR(&stream));
     return false;
@@ -1618,6 +1745,56 @@ EXPORTED bool aergo_query_smart_contract_async(aergo *instance, query_smart_cont
   }
 
   return aergo_query_smart_contract_json_async(instance, cb, args, contract_address, function, pargs);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static bool aergo_query_smart_contract_state_variable__internal(aergo *instance, query_state_var_cb cb, void *arg, char *result, int resultlen, const char *contract_address, const char *var_name) {
+  uint8_t *buffer=NULL;
+  size_t size = 1024;
+  struct request *request = NULL;
+  bool status = false;
+
+  DEBUG_PRINTLN("aergo_query_smart_contract_state_variableiable");
+
+  if (!instance || !contract_address || !var_name) return false;
+
+  if (result) result[0] = 0;
+
+  buffer = malloc(size);
+  if (!buffer) goto loc_exit;
+
+  if (EncodeStateQuery(buffer, &size, contract_address, var_name) == false) {
+    goto loc_exit;
+  }
+
+  request = new_request(instance);
+  if (!request) goto loc_exit;
+
+  request->data = buffer;
+  request->size = size;
+  request->callback = cb;
+  request->arg = arg;
+  request->return_ptr = result;
+  request->return_size = resultlen;
+
+  request->process_error = handle_query_error;
+
+  status = send_grpc_request(instance, "QueryContractState", request, handle_query_state_var_response);
+
+loc_exit:
+  if (buffer) free(buffer);
+  return status;
+}
+
+EXPORTED bool aergo_query_smart_contract_state_variable(aergo *instance, char *result, int resultlen, const char *contract_address, const char *var_name) {
+  if (!result || resultlen <= 0) return false;
+  return aergo_query_smart_contract_state_variable__internal(instance, NULL, NULL, result, resultlen, contract_address, var_name);
+}
+
+EXPORTED bool aergo_query_smart_contract_state_variable_async(aergo *instance, query_state_var_cb cb, void *arg, const char *contract_address, const char *var_name) {
+  if (!cb) return false;
+  return aergo_query_smart_contract_state_variable__internal(instance, cb, arg, NULL, 0, contract_address, var_name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
