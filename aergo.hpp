@@ -148,6 +148,17 @@ public:
     return aergo_query_smart_contract_json_async(instance, cb, arg, contract_address.c_str(), function.c_str(), json_args.c_str());
   }
 
+  // Query smart contract state variable - synchronous
+
+  bool query_smart_contract_state_variable(char *result, int resultlen, string contract_address, string state_var) {
+    return aergo_query_smart_contract_state_variable(instance, result, resultlen, contract_address.c_str(), state_var.c_str());
+  }
+
+  // Query smart contract state variable - asynchronous
+
+  bool query_smart_contract_state_variable_async(query_state_var_cb cb, void *arg, string contract_address, string state_var) {
+    return aergo_query_smart_contract_state_variable_async(instance, cb, arg, contract_address.c_str(), state_var.c_str());
+  }
 
   // Smart contract events
 

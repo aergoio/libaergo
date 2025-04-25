@@ -260,6 +260,44 @@ class Aergo {
   }
 
 
+  func query_state_variable(contractAddress: String, stateVariable: String) -> (success: Bool, result: String) {
+    var ret: Bool
+    var buffer = [Int8](repeating: 0, count: 65536)
+
+    ret = aergo_query_smart_contract_state_variable(
+      instance,
+      &buffer, 65536,
+      contractAddress,
+      stateVariable)
+
+    if (ret == false) { return (false, "the call failed") }
+
+    return (true, String(cString: buffer))
+  }
+
+  func query_state_variable_async(contractAddress: String, stateVariable: String,
+                               callback: @escaping (Any?,Bool,String)->(),
+                               context: Any? = nil) -> Bool {
+
+    let callback_info = QueryCallbackInfo(cb: callback, ctx: context)
+    let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(callback_info).toOpaque())
+
+    let ret = aergo_query_smart_contract_state_variable_async(
+      instance,
+      on_query_internal_callback,
+      ctx,
+      contractAddress,
+      stateVariable
+    )
+
+    if (ret == false) {
+      // unretain the object
+      _ = Unmanaged<QueryCallbackInfo>.fromOpaque(ctx).takeRetainedValue()
+    }
+
+    return ret
+  }
+
 
   class func update_c_account(account: AergoAccount, c_account: inout aergo_account) {
 

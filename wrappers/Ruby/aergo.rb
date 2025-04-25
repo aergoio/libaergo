@@ -91,6 +91,12 @@ module AergoAPI
 
   attach_function 'aergo_transfer_int_async', [:pointer, :receipt_callback, :pointer, Account.by_ref, :string, :uint64, :uint64], :bool
 
+  # Smart Contract State Variable Query
+
+  attach_function 'aergo_query_smart_contract_state_variable', [:pointer, :pointer, :int, :string, :string], :bool
+
+  attach_function 'aergo_query_smart_contract_state_variable_async', [:pointer, :query_smart_contract_cb, :pointer, :string, :string], :bool
+
 end
 
 
@@ -299,6 +305,31 @@ class Aergo
 
         end
 
+    end
+
+    # Smart Contract State Variable Query
+
+    def query_smart_contract_state_variable(contract_address, state_var)
+        resultlen = 2048
+        resultptr = FFI::MemoryPointer.new(:int8, resultlen)
+
+        ret = AergoAPI.aergo_query_smart_contract_state_variable(@instance,
+            resultptr,
+            resultlen,
+            contract_address,
+            state_var)
+
+        result = resultptr.read_string().force_encoding('UTF-8')
+
+        { "success" => ret, "result" => result }
+    end
+
+    def query_smart_contract_state_variable_async(callback, context, contract_address, state_var)
+        AergoAPI.aergo_query_smart_contract_state_variable_async(@instance,
+            callback,
+            context,
+            contract_address,
+            state_var)
     end
 
 end

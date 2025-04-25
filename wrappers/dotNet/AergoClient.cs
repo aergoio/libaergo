@@ -174,6 +174,11 @@ public class AergoClient : IDisposable
     [DllImport("aergo-0.1.dll", EntryPoint = "aergo_process_requests", CallingConvention = CallingConvention.Cdecl)]
     private static extern int  aergo_process_requests(IntPtr _Instance, int Timeout);
 
+    [DllImport("aergo-0.1.dll", EntryPoint = "aergo_query_smart_contract_state_variable", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool aergo_query_smart_contract_state_variable(IntPtr _Instance, [Out, MarshalAs(UnmanagedType.LPStr)] StringBuilder Result, int Size, string ContractAddress, string StateVar);
+
+    [DllImport("aergo-0.1.dll", EntryPoint = "aergo_query_smart_contract_state_variable_async", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool aergo_query_smart_contract_state_variable_async(IntPtr _Instance, [MarshalAs(UnmanagedType.FunctionPtr)] QuerySmartContractCallback Callback, CallbackState Context, string ContractAddress, string StateVar);
 
     private IntPtr _Instance = IntPtr.Zero;
 
@@ -352,6 +357,20 @@ public class AergoClient : IDisposable
             buf[j] = temp;
         }
         return aergo_transfer_bignum_async(_Instance, Callback, Context, ref account, ToAccount, buf, buf.Length);
+    }
+
+    // Query Smart Contract State Variable
+
+    public QueryResult QuerySmartContractStateVariable(string ContractAddress, string StateVar)
+    {
+        StringBuilder sb = new StringBuilder(4096);
+        Boolean success = aergo_query_smart_contract_state_variable(_Instance, sb, sb.Capacity, ContractAddress, StateVar);
+        return new QueryResult { result = sb.ToString(), success = success };
+    }
+
+    public bool QuerySmartContractStateVariableAsync(QuerySmartContractCallback Callback, CallbackState Context, string ContractAddress, string StateVar)
+    {
+        return aergo_query_smart_contract_state_variable_async(_Instance, Callback, Context, ContractAddress, StateVar);
     }
 
 }
