@@ -15,7 +15,7 @@ static void sleep_ms(int milliseconds){ // cross-platform sleep function
 #endif
 }
 
-static int aergo_process_requests__int(
+static int aergo_process_requests__internal(
   aergo *instance,
   int timeout,
   request *main_request,
@@ -107,7 +107,7 @@ loc_failed:
 
 EXPORTED int aergo_process_requests(aergo *instance, int timeout) {
   /* no timeout, just check and return immediately */
-  return aergo_process_requests__int(instance, timeout, NULL, NULL);
+  return aergo_process_requests__internal(instance, timeout, NULL, NULL);
 }
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size){
@@ -322,7 +322,7 @@ bool send_grpc_request(
     success = true;
   } else {
     /* if the call is synchronous, wait for the response */
-    aergo_process_requests__int(instance, instance->timeout, request, &success);
+    aergo_process_requests__internal(instance, instance->timeout, request, &success);
   }
 
   DEBUG_PRINTF("send_grpc_request %s\n", success ? "OK" : "FAILED");

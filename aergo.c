@@ -397,7 +397,7 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
   /* was the transaction OK? */
   if (response.results.error == CommitStatus_TX_OK) {
     /* request a transaction receipt */
-    return aergo_get_receipt__int(instance,
+    return aergo_get_receipt__internal(instance,
               request->txn_hash,
               request->callback,
               request->arg,
@@ -444,7 +444,7 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
   /* was the transaction OK? */
   if (response.results.error == CommitStatus_TX_OK) {
     /* request a transaction receipt */
-    return aergo_get_receipt__int(instance,
+    return aergo_get_receipt__internal(instance,
               request->txn_hash,
               request->callback,
               request->arg,
@@ -1244,7 +1244,7 @@ void free_request(aergo *instance, struct request *request) {
 // EXPORTED FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const char *amount, int len){
+static bool aergo_transfer_bignum__internal(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const char *amount, int len){
   uint8_t buffer[1024], txn_hash[32];
   size_t size;
   struct request *request = NULL;
@@ -1293,12 +1293,12 @@ static bool aergo_transfer_bignum__int(aergo *instance, transaction_receipt_cb c
 
 EXPORTED bool aergo_transfer_bignum(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
   //if (!receipt) return false; -- do not ask for a txn receipt
-  return aergo_transfer_bignum__int(instance, NULL, NULL, receipt, from_account, to_account, amount, len);
+  return aergo_transfer_bignum__internal(instance, NULL, NULL, receipt, from_account, to_account, amount, len);
 }
 
 EXPORTED bool aergo_transfer_bignum_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *from_account, const char *to_account, const unsigned char *amount, int len){
   if (!cb) return false;
-  return aergo_transfer_bignum__int(instance, cb, arg, NULL, from_account, to_account, amount, len);
+  return aergo_transfer_bignum__internal(instance, cb, arg, NULL, from_account, to_account, amount, len);
 }
 
 EXPORTED bool aergo_transfer_str(aergo *instance, transaction_receipt *receipt, aergo_account *from_account, const char *to_account, const char *value){
@@ -1355,7 +1355,7 @@ EXPORTED bool aergo_transfer_int_async(aergo *instance, transaction_receipt_cb c
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool aergo_multicall__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, const char *payload){
+static bool aergo_multicall__internal(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, const char *payload){
   uint8_t *buffer=NULL, txn_hash[32];
   size_t size;
   struct request *request = NULL;
@@ -1413,17 +1413,17 @@ loc_exit:
 
 EXPORTED bool aergo_multicall(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *payload){
   if (!receipt) return false;
-  return aergo_multicall__int(instance, NULL, NULL, receipt, account, payload);
+  return aergo_multicall__internal(instance, NULL, NULL, receipt, account, payload);
 }
 
 EXPORTED bool aergo_multicall_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *payload){
   if (!cb) return false;
-  return aergo_multicall__int(instance, cb, arg, NULL, account, payload);
+  return aergo_multicall__internal(instance, cb, arg, NULL, account, payload);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool aergo_call_smart_contract__int(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *args){
+static bool aergo_call_smart_contract__internal(aergo *instance, transaction_receipt_cb cb, void *arg, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *args){
   uint8_t *call_info=NULL, *buffer=NULL, txn_hash[32];
   size_t size;
   struct request *request = NULL;
@@ -1490,12 +1490,12 @@ loc_exit:
 
 EXPORTED bool aergo_call_smart_contract_json(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *args){
   if (!receipt) return false;
-  return aergo_call_smart_contract__int(instance, NULL, NULL, receipt, account, contract_address, function, args);
+  return aergo_call_smart_contract__internal(instance, NULL, NULL, receipt, account, contract_address, function, args);
 }
 
 EXPORTED bool aergo_call_smart_contract_json_async(aergo *instance, transaction_receipt_cb cb, void *arg, aergo_account *account, const char *contract_address, const char *function, const char *args){
   if (!cb) return false;
-  return aergo_call_smart_contract__int(instance, cb, arg, NULL, account, contract_address, function, args);
+  return aergo_call_smart_contract__internal(instance, cb, arg, NULL, account, contract_address, function, args);
 }
 
 EXPORTED bool aergo_call_smart_contract(aergo *instance, transaction_receipt *receipt, aergo_account *account, const char *contract_address, const char *function, const char *types, ...){
@@ -1526,7 +1526,7 @@ EXPORTED bool aergo_call_smart_contract_async(aergo *instance, transaction_recei
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool aergo_query_smart_contract__int(aergo *instance, query_smart_contract_cb cb, void *arg, char *result, int resultlen, const char *contract_address, const char *function, const char *args){
+static bool aergo_query_smart_contract__internal(aergo *instance, query_smart_contract_cb cb, void *arg, char *result, int resultlen, const char *contract_address, const char *function, const char *args){
   uint8_t *query_info=NULL, *buffer=NULL, txn_hash[32];
   size_t size;
   struct request *request = NULL;
@@ -1576,12 +1576,12 @@ loc_exit:
 
 EXPORTED bool aergo_query_smart_contract_json(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *args){
   if (!result || resultlen <= 0) return false;
-  return aergo_query_smart_contract__int(instance, NULL, NULL, result, resultlen, contract_address, function, args);
+  return aergo_query_smart_contract__internal(instance, NULL, NULL, result, resultlen, contract_address, function, args);
 }
 
 EXPORTED bool aergo_query_smart_contract_json_async(aergo *instance, query_smart_contract_cb cb, void *arg, const char *contract_address, const char *function, const char *args){
   if (!cb) return false;
-  return aergo_query_smart_contract__int(instance, cb, arg, NULL, 0, contract_address, function, args);
+  return aergo_query_smart_contract__internal(instance, cb, arg, NULL, 0, contract_address, function, args);
 }
 
 EXPORTED bool aergo_query_smart_contract(aergo *instance, char *result, int resultlen, const char *contract_address, const char *function, const char *types, ...){
@@ -1656,7 +1656,7 @@ static bool on_failed_receipt(aergo *instance, struct request *request) {
 
   if (strstr(request->error_msg, "tx not found")) {
     /* request a new transaction receipt */
-    return aergo_get_receipt__int(instance,
+    return aergo_get_receipt__internal(instance,
            request->txn_hash,
            request->callback,
            request->arg,
@@ -1667,7 +1667,7 @@ static bool on_failed_receipt(aergo *instance, struct request *request) {
   return false;
 }
 
-static bool aergo_get_receipt__int(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, bool retry_on_failure){
+static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, bool retry_on_failure){
   uint8_t buffer[256];
   size_t size;
   struct request *request = NULL;
@@ -1698,19 +1698,19 @@ static bool aergo_get_receipt__int(aergo *instance, const char *txn_hash, transa
 
 EXPORTED bool aergo_get_receipt(aergo *instance, const char *txn_hash, struct transaction_receipt *receipt){
   if (!receipt) return false;
-  return aergo_get_receipt__int(instance, txn_hash, NULL, NULL, receipt, false);
+  return aergo_get_receipt__internal(instance, txn_hash, NULL, NULL, receipt, false);
 }
 
 EXPORTED bool aergo_get_receipt_async(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg){
   if (!cb) return false;
-  return aergo_get_receipt__int(instance, txn_hash, cb, arg, NULL, false);
+  return aergo_get_receipt__internal(instance, txn_hash, cb, arg, NULL, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
 
-static bool aergo_get_block__int(aergo *instance, uint64_t blockNo){
+static bool aergo_get_block__internal(aergo *instance, uint64_t blockNo){
   uint8_t buffer[128];
   size_t size;
   struct request *request = NULL;
