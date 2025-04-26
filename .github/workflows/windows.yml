@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: install libcurl
       shell: cmd
       run: |
@@ -74,7 +74,7 @@ jobs:
         copy nghttp2.dll builds-win\x64\
         copy secp256k1-vrf.dll builds-win\x64\
     - name: upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: libaergo-windows
         path: |

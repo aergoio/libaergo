@@ -18,13 +18,13 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'skip ci')"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: ubuntu
       if: ${{ matrix.platform == 'ubuntu-latest' }}
-      run: sudo apt install libcurl4-openssl-dev -y
+      run: sudo apt install libcurl4-openssl-dev libtool -y
     - name: mac
       if: ${{ matrix.platform == 'macos-latest' }}
-      run: brew install automake
+      run: brew install automake libtool
     - name: install dependencies
       run: |
         git clone --depth=1 https://github.com/aergoio/secp256k1-vrf
