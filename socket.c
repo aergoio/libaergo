@@ -29,7 +29,7 @@ static int aergo_process_requests__internal(
 
   DEBUG_PRINTF("aergo_process_requests timeout=%d\n", timeout);
 
-loc_again:
+loc_wait_again:
 
   if (instance->transfers > 0) {
     int numfds;
@@ -68,13 +68,41 @@ loc_again:
 
   }
 
+loc_check_receipts:
+
+  /* check for requests that need to fetch a receipt */
+  for (request = instance->requests; request; request = request->next) {
+    if (request->processed && request->success && request->need_receipt && !request->processing_receipt) {
+      /* mark the request as processing a receipt */
+      request->processing_receipt = true;
+
+      /* request the receipt */
+      bool success = aergo_get_receipt__internal(instance,
+                request->txn_hash,
+                request->callback,
+                request->arg,
+                (transaction_receipt *) request->return_ptr,
+                request);
+
+      if (!success) {
+        request->need_receipt = false;
+      }
+
+      /* instead of looping because the request object can be invalidated */
+      goto loc_check_receipts;
+    }
+  }
+
+  /* if the main request is supplied, it is a synchronous call */
   if (main_request) {
-    if (main_request->processed) {
+    /* if the main request is processed, return the result */
+    if (main_request->processed && !main_request->need_receipt) {
       if (psuccess) {
         *psuccess = main_request->success;
       }
+    /* otherwise wait for it to be processed */
     } else if (instance->transfers > 0) {
-      goto loc_again;
+      goto loc_wait_again;
     }
   }
 
@@ -82,7 +110,7 @@ loc_exit:
 
   /* release processed requests */
   for (request=instance->requests; request; request=request->next) {
-    if (request->processed && !request->keep_active) {
+    if (request->processed && !request->need_receipt && !request->keep_active) {
       free_request(instance, request);
       goto loc_exit; /* start again from the beginning */
     }
@@ -105,8 +133,8 @@ loc_failed:
 
 }
 
+/* for async calls, check for results within the given timeout */
 EXPORTED int aergo_process_requests(aergo *instance, int timeout) {
-  /* no timeout, just check and return immediately */
   return aergo_process_requests__internal(instance, timeout, NULL, NULL);
 }
 

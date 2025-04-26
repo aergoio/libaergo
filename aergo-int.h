@@ -30,6 +30,7 @@ typedef bool (*process_response_cb)(aergo *instance, request *request);
 
 struct request {
   struct request *next;
+  struct request *parent;
   aergo *instance;
   void *data;
   int size;
@@ -48,6 +49,9 @@ struct request {
   bool processed;
   bool success;
   char *error_msg;
+  bool need_receipt;
+  bool processing_receipt;
+  int  receipt_attempts;
   bool keep_active;
 };
 
@@ -71,4 +75,4 @@ void free_request(aergo *instance, struct request *request);
 
 uint32_t encode_http2_data_frame(uint8_t *buffer, uint32_t content_size);
 
-static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, bool retry_on_failure);
+static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, struct request *parent);

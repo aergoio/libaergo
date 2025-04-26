@@ -408,13 +408,9 @@ bool handle_transfer_response(aergo *instance, struct request *request) {
 
   /* was the transaction OK? */
   if (response.results.error == CommitStatus_TX_OK) {
-    /* request a transaction receipt */
-    return aergo_get_receipt__internal(instance,
-              request->txn_hash,
-              request->callback,
-              request->arg,
-              (transaction_receipt *) request->return_ptr,
-              true);
+    /* mark the request to fetch a transaction receipt */
+    request->need_receipt = true;
+    return true;
   } else {
     transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
     if (receipt) {
@@ -455,13 +451,9 @@ bool handle_contract_call_response(aergo *instance, struct request *request) {
 
   /* was the transaction OK? */
   if (response.results.error == CommitStatus_TX_OK) {
-    /* request a transaction receipt */
-    return aergo_get_receipt__internal(instance,
-              request->txn_hash,
-              request->callback,
-              request->arg,
-              (transaction_receipt *) request->return_ptr,
-              true);
+    /* mark the request to fetch a transaction receipt */
+    request->need_receipt = true;
+    return true;
   } else {
     transaction_receipt *receipt = (transaction_receipt *) request->return_ptr;
     if (receipt) {
@@ -647,6 +639,7 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   Receipt response = Receipt_init_zero;
   transaction_receipt *receipt, on_stack_receipt;
   char raw_address[64];
+  bool ret_val = true;
 
   DEBUG_PRINT_BUFFER("handle_receipt_response", data, len);
 
@@ -688,7 +681,8 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
   /* Decode the message */
   if (pb_decode(&stream, Receipt_fields, &response) == false) {
     DEBUG_PRINTF("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-    return false;
+    ret_val = false;
+    goto loc_exit;
   }
 
   /* encode the contract address from binary to string format */
@@ -705,7 +699,14 @@ bool handle_receipt_response(aergo *instance, struct request *request) {
     callback(request->arg, receipt);
   }
 
-  return true;
+loc_exit:
+
+  if (request->parent != NULL) {
+    request->parent->need_receipt = false;
+    request->parent->processing_receipt = false;
+  }
+
+  return ret_val;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1831,20 +1832,39 @@ static bool on_failed_receipt(aergo *instance, struct request *request) {
 
   DEBUG_PRINTLN("on_failed_receipt");
 
-  if (strstr(request->error_msg, "tx not found")) {
-    /* request a new transaction receipt */
-    return aergo_get_receipt__internal(instance,
-           request->txn_hash,
-           request->callback,
-           request->arg,
-           (transaction_receipt *) request->return_ptr,
-           true);
+  if (request->parent != NULL) {
+    struct request *parent = request->parent;
+    if (strstr(request->error_msg, "tx not found")) {
+      /* Increment the counter to trigger a retry */
+      parent->receipt_attempts++;
+      /* Limit the number of retries to 10 */
+      if (parent->receipt_attempts >= 10) {
+        DEBUG_PRINTLN("Giving up after 10 receipt fetch attempts");
+        parent->need_receipt = false;
+        // continue to call the callback with the error message
+      } else {
+        /* flag as not processing a receipt to retry the receipt fetch */
+        parent->processing_receipt = false;
+        return false;
+      }
+    /* if it is another error message, do not retry */
+    } else {
+      parent->need_receipt = false;
+    }
+  }
+
+  if (request->callback) {
+    transaction_receipt_cb callback = (transaction_receipt_cb) request->callback;
+    transaction_receipt receipt = {0};
+    strncpy(receipt.status, "FAILED", sizeof(receipt.status));
+    strncpy(receipt.ret, request->error_msg, sizeof(receipt.ret));
+    callback(request->arg, &receipt);
   }
 
   return false;
 }
 
-static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, bool retry_on_failure){
+static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg, struct transaction_receipt *receipt, struct request *parent){
   uint8_t buffer[256];
   size_t size;
   struct request *request = NULL;
@@ -1866,7 +1886,8 @@ static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, t
   request->arg = arg;
   request->return_ptr = receipt;
 
-  if (retry_on_failure) {
+  if (parent) {
+    request->parent = parent;
     request->process_error = on_failed_receipt;
   }
 
@@ -1875,12 +1896,12 @@ static bool aergo_get_receipt__internal(aergo *instance, const char *txn_hash, t
 
 EXPORTED bool aergo_get_receipt(aergo *instance, const char *txn_hash, struct transaction_receipt *receipt){
   if (!receipt) return false;
-  return aergo_get_receipt__internal(instance, txn_hash, NULL, NULL, receipt, false);
+  return aergo_get_receipt__internal(instance, txn_hash, NULL, NULL, receipt, NULL);
 }
 
 EXPORTED bool aergo_get_receipt_async(aergo *instance, const char *txn_hash, transaction_receipt_cb cb, void *arg){
   if (!cb) return false;
-  return aergo_get_receipt__internal(instance, txn_hash, cb, arg, NULL, false);
+  return aergo_get_receipt__internal(instance, txn_hash, cb, arg, NULL, NULL);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
