@@ -108,20 +108,21 @@ On some languages you can also include the static library in your project instea
 * Get Account State
 * Smart Contract Call
 * Smart Contract Query
+* Smart Contract Query State Variable
 * Smart Contract Events Notification
 * Transfer
-
+* Multicall
 
 ## API
 
 * [Documentation](https://github.com/aergoio/libaergo/wiki)
-* [Exported functions](https://github.com/aergoio/herac/blob/master/aergo.h)
-* [C++ class header](https://github.com/aergoio/herac/blob/master/aergo.hpp)
+* [Exported functions](https://github.com/aergoio/libaergo/blob/master/aergo.h)
+* [C++ class header](https://github.com/aergoio/libaergo/blob/master/aergo.hpp)
 
 
 ## Examples
 
-There are many [usage examples](https://github.com/aergoio/herac/tree/master/examples)
+There are many [usage examples](https://github.com/aergoio/libaergo/tree/master/examples)
 available for each supported language, for synchronous and asynchronous calls.
 
 Compiling an example code:
